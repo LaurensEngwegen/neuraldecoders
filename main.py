@@ -241,24 +241,5 @@ if __name__ == '__main__':
 
 
     # TODO:
-    # - Fix the fact that raw/CAR data is 2D and features data is 3D (PROBABLY FIXED AS IN SVM_Classifier)
-    # - Find out what to do with 'buffer' (maybe just leave it as is if we're gonna downsample to 512Hz anyway)
-    # - Implement way to only use subset of electrodes for CAR (for acute3 or 4)
-
     # - Figure out how to deal with interpretation of results: rest class might be 100% accurate and influence total accuracy
     #       Maybe use F1 score, or visualize confusion matrix, but that's not possible to do for all experiments
-
-
-    # Most important parameters for random forest:
-    # - n_estimators (100)
-    # - max_depth (None) --> over-/underfitting
-    # - min_samples_split (2) --> over-/underfitting
-    # - min_samples_leaf (1)
-    # - max_leaf_nodes (None)
-
-
-    # Voor Acute004: specifieke CAR channels zijn defined in datafile
-    # deze zouden in theorie (bijna) alleen maar noise moeten bevatten
-    # en zijn daarom goed/optimaal voor CAR
-
-    # Voor Acute 3 of 4(?): speech signal zit in data
