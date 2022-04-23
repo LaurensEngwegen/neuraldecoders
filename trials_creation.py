@@ -100,11 +100,19 @@ class Trials_Creator():
         for trial in task_data:
             # Create trial from VOT if active trial
             if trial[3] in self.label_indices[:-1]:
-                data.append(processed_data[:, :, trial[1]+startpoint:trial[1]+endpoint])
+                # Need to check this because with extracted features shape is [E x B x T]
+                # Otherwise (raw or CAR data) just [E x T]
+                if len(processed_data.shape) == 3:
+                    data.append(processed_data[:, :, trial[1]+startpoint:trial[1]+endpoint])
+                else:
+                    data.append(processed_data[:, trial[1]+startpoint:trial[1]+endpoint])
                 labels.append(trial[3])
             # Create trial from QOT if rest trial
             elif trial[3] == self.label_indices[-1]:
-                data.append(processed_data[:, :, trial[0]:trial[0]+totalpoints])
+                if len(processed_data.shape) == 3:
+                    data.append(processed_data[:, :, trial[0]:trial[0]+totalpoints])
+                else:
+                    data.append(processed_data[:, trial[0]:trial[0]+totalpoints])
                 labels.append(trial[3])
         data = np.array(data)
         labels = np.array(labels)
@@ -120,7 +128,9 @@ class Trials_Creator():
     def save_trials(self, save_path):
         # Check if file already exists
         if os.path.exists(save_path):
-            print(f'\nOverwriting trials stored in: {save_path}')
+            print(f'\nOverwriting trials stored in: {save_path}...')
+        else:
+            print(f'Writing trials to {save_path}...')
         # Store X and y in pickle file
         with open(save_path, 'wb') as f:
             pkl.dump([self.X, self.y], f)
