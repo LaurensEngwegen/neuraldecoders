@@ -36,7 +36,7 @@ class Preprocessor():
                 self.n_channels += len(channel_set)
             self.ecog_data, self.valid_spectra_pnts, self.break_points = self.read_raw_data(data_filename)
 
-        print(f'\nStart preprocessing for patient \'{patient_data.patient}\'\n')
+        print(f'\n\nStart preprocessing for patient \'{patient_data.patient}\'\n')
 
         # Downsample to self.sampling_rate if needed
         if patient_data.sampling_rate > self.sampling_rate:
@@ -47,7 +47,7 @@ class Preprocessor():
 
         if self.preprocessing_type != 'raw' and self.preprocessing_type != 'given_features':
             # Comman average referencing
-            self.ecog_data = self.CAR(self.ecog_data)
+            self.ecog_data = self.CAR(self.ecog_data, patient_data.CAR_channels)
             if self.preprocessing_type != 'CAR':
                 # Get and plot convolved responses
                 self.ecog_data = self.wavelet_transform(self.ecog_data, plot_result=True)
@@ -144,10 +144,15 @@ class Preprocessor():
         data = notch_filter(data, self.sampling_rate, freqs, verbose=False)
         return data
 
-    def CAR(self, data):
-        print(f'CAR...')
+    def CAR(self, data, CAR_channels):
         # Comman Average Referencing
-        car_data = data - np.mean(data, 0)
+        print(f'CAR...')
+        # Use all channels
+        if CAR_channels is None:
+            car_data = data - np.mean(data, 0)
+        # Use specified set of channels
+        else:
+            car_data = data - np.mean(data[CAR_channels], 0)
         return car_data
 
    # TODO: add more comments
@@ -186,7 +191,6 @@ class Preprocessor():
                 single_electrode_responses.append(np.mean(np.array(norm_spectra), 0))
 
             response_spectra.append(single_electrode_responses)
-
         '''
         if plot_result:    
             plt.matshow(gamma_feature, aspect='auto')
