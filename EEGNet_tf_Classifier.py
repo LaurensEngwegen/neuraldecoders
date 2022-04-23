@@ -19,7 +19,7 @@ class EEGNet_tf_Classifier():
     def __init__(self, 
                  X, 
                  y, 
-                 labels, 
+                 labelsdict, 
                  n_channels = 60,
                  n_samples = 512,
                  dropoutRate = 0.5,
@@ -33,11 +33,11 @@ class EEGNet_tf_Classifier():
         self.X = X
         self.y = np_utils.to_categorical(y-1)
         # print(self.y)
-        self.labels = labels
-        self.id2label = dict()
-        for i in range(len(self.labels)):
-            self.id2label[i+1] = self.labels[i]
-        self.n_classes = len(labels)
+        self.labels = []
+        for _, label in labelsdict.items():
+            self.labels.append(label)
+        self.id2label = labelsdict
+        self.n_classes = len(self.labels)
 
         # Variables and parameters needed for model
         self.n_channels = n_channels

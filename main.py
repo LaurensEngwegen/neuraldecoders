@@ -80,7 +80,7 @@ def classification(classifier,
             stmf_cls.single_classification(test_index)
             accuracy = -1
         if LOO:
-            accuracy = stmf_cls.LOO_classification(plot_cm)
+            accuracy = stmf_cls.LOO_classification(plot_cm, plot_HFB=False)
 
     # Classification with a support vector machine
     elif classifier == 'SVM':
@@ -107,9 +107,9 @@ def classification(classifier,
             'n_samples': int((trial_window_stop-trial_window_start) * sampling_rate),
             'dropoutRate': 0.5,
             'kernLength': int(sampling_rate/2),
-            'F1': 4, # 8
-            'D': 2, # 2
-            'F2': 8, # 16
+            'F1': 8, # default: 8
+            'D': 2, # default: 2
+            'F2': 16, # default: 16
             'norm_rate': 0.25, 
             'dropoutType': 'Dropout'
         }
@@ -141,23 +141,20 @@ def classification_loop(patient_IDs,
     # Create dict to store accuracies 
     # (in lists for possibility to average over multiple experiments)
     accuracies = dict()
-    for pid in patient_IDs:
-        for pr_type in preprocessing_types:
-            for clf in classifiers:
-                accuracies[f'{pid}_{pr_type}_{clf}'] = []
-
-    for pID in patient_IDs:
-        patient_data = PatientDataMapper(pID)
-        for preprocessing_type in preprocessing_types:
-            trials_name = preprocessing_type # preprocessing_type or 'test'
-            # Path where trials should be/are stored
-            trials_path = f'data/{patient_data.patient}/{patient_data.patient}_{trials_name}_trials.pkl'
-            # Define mapping from indices to labels (differs per patient)
-            labelsdict = {patient_data.label_indices[i]: labels[i] for i in range(len(labels))}
-            # Load (preprocessed) trials for specific patient
-            X, y = load_trials(trials_path)
-            # Start classification loop
-            for classifier in classifiers:
+    # Start classification loop
+    for classifier in classifiers:
+        accuracies[classifier] = dict()
+        for pID in patient_IDs:
+            patient_data = PatientDataMapper(pID)
+            accuracies[classifier][patient_data.patient] = dict()
+            for preprocessing_type in preprocessing_types:
+                # Path where trials should be/are stored
+                trials_path = f'data/{patient_data.patient}/{patient_data.patient}_{preprocessing_type}_trials.pkl'
+                # Define mapping from indices to labels (differs per patient)
+                labelsdict = {patient_data.label_indices[i]: labels[i] for i in range(len(labels))}
+                # Load (preprocessed) trials for specific patient
+                X, y = load_trials(trials_path)
+                accuracies[classifier][patient_data.patient][preprocessing_type] = []
                 for i in range(n_experiments):
                     print(f'\nRepetition {i+1} using \'{preprocessing_type}\' trials from patient \'{pID}\'')
                     print(f'Classification with {classifier}...')
@@ -171,8 +168,18 @@ def classification_loop(patient_IDs,
                                               LOO=True,
                                               plot_cm=False, 
                                               test_index=None)
-                    accuracies[f'{pID}_{preprocessing_type}_{classifier}'].append(accuracy)
+                    accuracies[classifier][patient_data.patient][preprocessing_type].append(accuracy)
     return accuracies
+
+def print_results(accuracies, n_experiments):
+    # Accuracies is dictionary with [classifier][patient][preprocessing_type]
+    print(f'\n\nAverage accuracies (over {n_experiments} runs)\n')
+    for classifier, patient_dict in accuracies.items():
+        print(f'{classifier}')
+        for patient, processing_dict in patient_dict.items():
+            for processing, all_accs in processing_dict.items():
+                all_accs = np.array(all_accs)
+                print(f'{patient}-{processing}:\t{np.mean(all_accs)} ({np.std(all_accs)})')
 
 
 if __name__ == '__main__':
@@ -190,45 +197,49 @@ if __name__ == '__main__':
     # Patient data to use
     patient_IDs = ['1','2','3','4','5','6']
     # Type of preprocessing/features to extract
-    preprocessing_types = ['delta', 'theta', 'alpha', 'beta', 'lowgamma', 'highgamma', 'allbands']
-    # preprocessing_types = ['highgamma']
+    # preprocessing_types = ['delta', 'theta', 'alpha', 'beta', 'lowgamma', 'highgamma', 'allbands']
+    preprocessing_types = ['CAR', 'raw']
     # Define which classifiers to experiment with: 'STMF' / 'SVM' / 'RF' / 'EEGNet'
-    classifiers = ['STMF']
+    classifiers = ['EEGNet']
     
+    # What to execute
+    preprocess = False
+    create_trials = False
+    classify = True
+    save_results = True
     
-    for pID in patient_IDs:
-        patient_data = PatientDataMapper(pID)
-        for ptype in preprocessing_types:
-            trials_path = f'data/{patient_data.patient}/{patient_data.patient}_{ptype}_trials.pkl'
-            create_data(patient_data, 
-                        sampling_rate,
-                        buffer, 
-                        ptype, 
-                        trial_window_start,
-                        trial_window_stop,
-                        trials_path=trials_path,
-                        create_trials=True)
+    if preprocess:
+        for pID in patient_IDs:
+            patient_data = PatientDataMapper(pID)
+            for ptype in preprocessing_types:
+                trials_path = f'data/{patient_data.patient}/{patient_data.patient}_{ptype}_trials.pkl'
+                create_data(patient_data, 
+                            sampling_rate,
+                            buffer, 
+                            ptype, 
+                            trial_window_start,
+                            trial_window_stop,
+                            trials_path=trials_path,
+                            create_trials=create_trials)
     
+    if classify:
+        # Number of experiments to average accuracy over 
+        # (only useful for non-deterministic classifiers)
+        n_experiments = 1
+        accuracies = classification_loop(patient_IDs, 
+                                        preprocessing_types,
+                                        classifiers,
+                                        n_experiments,
+                                        sampling_rate,
+                                        trial_window_start,
+                                        trial_window_stop)
+        print_results(accuracies, n_experiments)
+        if save_results:
+            for classifier in accuracies:
+                file = f'results/{classifier}/{classifier}_results.pkl'
+                with open(file, 'wb') as f:
+                    pkl.dump(accuracies[classifier], f)
 
-    # Number of experiments to average accuracy over 
-    # (only useful for non-deterministic classifiers)
-    n_experiments = 1
-    '''
-    accuracies = classification_loop(patient_IDs, 
-                                     preprocessing_types,
-                                     classifiers,
-                                     n_experiments,
-                                     sampling_rate,
-                                     trial_window_start,
-                                     trial_window_stop)
-
-    print(f'\n\nAverage accuracies (over {n_experiments} runs)')
-    for key in accuracies:
-        accs = np.array(accuracies[key])
-        # avg_acc = sum(accuracies[key])/len(accuracies[key])
-        print(f'{key}:\t{np.mean(accs)} ({np.std(accs)})')
-
-    '''
 
     # TODO:
     # - Fix the fact that raw/CAR data is 2D and features data is 3D (PROBABLY FIXED AS IN SVM_Classifier)
