@@ -1,4 +1,5 @@
 # Folders with sensitive data
+patient_data_mapping.py
 data/
 results/
 figures/
