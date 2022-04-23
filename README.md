@@ -1,1 +1,1 @@
-# thesis
+# Repository for MSc thesis project
