@@ -5,7 +5,7 @@ from tqdm import tqdm
 
 
 class SVM_Classifier():
-    def __init__(self, X, y, labelsdict, kernel='linear', print_progress=False):
+    def __init__(self, X, y, labelsdict, kernel='linear'):
         # self.X = X
         # Need to flatten for SVM (i.e. concatenate all electrodes)
         X = X.squeeze()
@@ -19,8 +19,6 @@ class SVM_Classifier():
             self.labels.append(label)
         self.id2label = labelsdict
         self.kernel = kernel
-
-        self.print_progress = print_progress
 
     def train(self, X_train, y_train):
         self.clf = SVC(kernel=self.kernel)
@@ -40,8 +38,6 @@ class SVM_Classifier():
         y_preds, y_trues = [], []
         correct = 0
         for i in tqdm(range(len(self.y))):
-            # if self.print_progress and (i+1) % 10 == 0:
-            #     print(f'Trial {i+1}/{len(self.y)}...')
             train_indices = [j for j in range(len(self.y)) if j != i]
             self.train(self.X[train_indices], self.y[train_indices])
             y_pred = self.predict(self.X[i])

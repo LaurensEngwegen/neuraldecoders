@@ -14,6 +14,7 @@ from tensorflow.keras import utils as np_utils
 import numpy as np
 import matplotlib.pyplot as plt
 from sklearn.metrics import ConfusionMatrixDisplay
+from tqdm import tqdm
 
 class EEGNet_tf_Classifier():
     def __init__(self, 
@@ -28,8 +29,7 @@ class EEGNet_tf_Classifier():
                  D = 2, 
                  F2 = 16, 
                  norm_rate = 0.25, 
-                 dropoutType = 'Dropout',
-                 print_progress = False):
+                 dropoutType = 'Dropout',):
         self.X = X
         self.y = np_utils.to_categorical(y-1)
         # print(self.y)
@@ -49,8 +49,6 @@ class EEGNet_tf_Classifier():
         self.F2 = F2
         self.norm_rate = norm_rate
         self.dropoutType = dropoutType
-
-        self.print_progress = print_progress
 
     def initialize_model(self):
         if self.dropoutType == 'SpatialDropout2D':
@@ -119,9 +117,7 @@ class EEGNet_tf_Classifier():
     def LOO_classification(self, plot_cm=True):
         y_preds, y_trues = [], []
         correct = 0
-        for i in range(len(self.y)):
-            if self.print_progress and (i+1) % 10 == 0:
-                print(f'Trial {i+1}/{len(self.y)}...')
+        for i in tqdm(range(len(self.y))):
             self.model = self.initialize_model()
             train_indices = [j for j in range(len(self.y)) if j != i]
             self.train(self.X[train_indices], self.y[train_indices])

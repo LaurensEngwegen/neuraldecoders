@@ -71,8 +71,7 @@ def classification(classifier,
                    trial_window_stop, 
                    LOO=False,
                    plot_cm=False, 
-                   test_index=None,
-                   print_progress=True):
+                   test_index=None):
     # Classification with STMF
     if classifier == 'STMF':
         stmf_cls = STMF_Classifier(X, y, labelsdict, trial_window_start, trial_window_stop)
@@ -84,7 +83,7 @@ def classification(classifier,
 
     # Classification with a support vector machine
     elif classifier == 'SVM':
-        svm = SVM_Classifier(X, y, labelsdict, print_progress=print_progress)
+        svm = SVM_Classifier(X, y, labelsdict)
         if test_index is not None:
             svm.single_classification(test_index)
             accuracy = -1
@@ -93,7 +92,7 @@ def classification(classifier,
 
     # Classification with a random forest
     elif classifier == 'RF':
-        rf = RF_Classifier(X, y, labelsdict, print_progress=print_progress)
+        rf = RF_Classifier(X, y, labelsdict)
         if test_index is not None:
             rf.single_classification(test_index)
             accuracy = -1
@@ -113,7 +112,7 @@ def classification(classifier,
             'norm_rate': 0.25, 
             'dropoutType': 'Dropout'
         }
-        eegnet_tf = EEGNet_tf_Classifier(X, y, labelsdict, n_channels=X.shape[1], print_progress=print_progress, **eegnet_kwargs)
+        eegnet_tf = EEGNet_tf_Classifier(X, y, labelsdict, n_channels=X.shape[1], **eegnet_kwargs)
         # print(eegnet_tf.initialize_model().summary())
         if test_index is not None:
             eegnet_tf.single_classification(test_index)

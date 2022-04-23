@@ -1,9 +1,10 @@
 import matplotlib.pyplot as plt
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import ConfusionMatrixDisplay
+from tqdm import tqdm
 
 class RF_Classifier():
-    def __init__(self, X, y, labelsdict, print_progress=False):
+    def __init__(self, X, y, labelsdict):
         # Need to flatten for RF (i.e. concatenate all electrodes)
         self.X = X.reshape(X.shape[0], X.shape[1]*X.shape[2])
         self.y = y
@@ -11,7 +12,6 @@ class RF_Classifier():
         for _, label in labelsdict.items():
             self.labels.append(label)
         self.id2label = labelsdict
-        self.print_progress = print_progress
 
     def train(self, X_train, y_train):
         self.rf = RandomForestClassifier()
@@ -30,9 +30,7 @@ class RF_Classifier():
     def LOO_classification(self, plot_cm=True):
         y_preds, y_trues = [], []
         correct = 0
-        for i in range(len(self.y)):
-            if self.print_progress and (i+1) % 10 == 0:
-                print(f'Trial {i+1}/{len(self.y)}...')
+        for i in tqdm(range(len(self.y))):
             train_indices = [j for j in range(len(self.y)) if j != i]
             self.train(self.X[train_indices], self.y[train_indices])
             y_pred = self.predict(self.X[i])
