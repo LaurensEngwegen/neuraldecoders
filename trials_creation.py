@@ -95,7 +95,7 @@ class Trials_Creator():
         startpoint = round(self.time_window_start * self.sampling_rate)
         endpoint = round(self.time_window_stop * self.sampling_rate)
         totalpoints = abs(startpoint)+abs(endpoint)
-        # Transpose taskdata to get (trials, info)
+        # Transpose taskdata to get [trials, info]
         task_data = self.task_data.T
         for trial in task_data:
             # Create trial from VOT if active trial

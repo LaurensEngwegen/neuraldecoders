@@ -3,15 +3,14 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import ConfusionMatrixDisplay
 
 class RF_Classifier():
-    def __init__(self, X, y, labels, print_progress=False):
+    def __init__(self, X, y, labelsdict, print_progress=False):
         # Need to flatten for RF (i.e. concatenate all electrodes)
         self.X = X.reshape(X.shape[0], X.shape[1]*X.shape[2])
         self.y = y
-        self.labels = labels
-        self.id2label = dict()
-        for i in range(len(self.labels)):
-            self.id2label[i+1] = self.labels[i]
-
+        self.labels = []
+        for _, label in labelsdict.items():
+            self.labels.append(label)
+        self.id2label = labelsdict
         self.print_progress = print_progress
 
     def train(self, X_train, y_train):

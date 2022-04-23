@@ -15,7 +15,6 @@ import pickle as pkl
 # Increase font size in plots
 plt.rcParams.update({'font.size': 14})
 
-
 # Function to preprocess data and create trials
 def create_data(patient_data,
                 sampling_rate,
@@ -182,17 +181,17 @@ if __name__ == '__main__':
     # Number of samples at beginning and end of file that should be excluded
     buffer = 64
     # Wherer does trial window start relative to VOT (seconds)
-    trial_window_start = -1.0
+    trial_window_start = -0.5
     # Wherer does trial window stop relative to VOT (seconds)
-    trial_window_stop = 1.0
+    trial_window_stop = 0.5
     # Spoken phonemes
     labels = ['/p/', '/oe/', '/a/', '/k/', 'Rest']
     
     # Patient data to use
-    patient_IDs = ['4', '5', '6']
+    patient_IDs = ['1','2','3','4','5','6']
     # Type of preprocessing/features to extract
-    # preprocessing_types = ['delta', 'theta', 'alpha', 'beta', 'lowgamma', 'highgamma', 'allbands']
-    preprocessing_types = ['highgamma']
+    preprocessing_types = ['delta', 'theta', 'alpha', 'beta', 'lowgamma', 'highgamma', 'allbands']
+    # preprocessing_types = ['highgamma']
     # Define which classifiers to experiment with: 'STMF' / 'SVM' / 'RF' / 'EEGNet'
     classifiers = ['STMF']
     
@@ -214,7 +213,7 @@ if __name__ == '__main__':
     # Number of experiments to average accuracy over 
     # (only useful for non-deterministic classifiers)
     n_experiments = 1
-
+    '''
     accuracies = classification_loop(patient_IDs, 
                                      preprocessing_types,
                                      classifiers,
@@ -229,7 +228,7 @@ if __name__ == '__main__':
         # avg_acc = sum(accuracies[key])/len(accuracies[key])
         print(f'{key}:\t{np.mean(accs)} ({np.std(accs)})')
 
-    
+    '''
 
     # TODO:
     # - Fix the fact that raw/CAR data is 2D and features data is 3D (PROBABLY FIXED AS IN SVM_Classifier)
