@@ -31,11 +31,12 @@ class EEGNet_tf_Classifier():
                  norm_rate = 0.25, 
                  dropoutType = 'Dropout',):
         self.X = X
-        self.y = np_utils.to_categorical(y-1)
-        # print(self.y)
+        self.y = y
         self.labels = []
-        for _, label in labelsdict.items():
+        for i, (id, label) in enumerate(labelsdict.items()):
             self.labels.append(label)
+            self.y = np.where(y==id, i, self.y)
+        self.y = np_utils.to_categorical(self.y)
         self.id2label = labelsdict
         self.n_classes = len(self.labels)
 

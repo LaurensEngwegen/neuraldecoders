@@ -196,10 +196,10 @@ if __name__ == '__main__':
     # Patient data to use
     patient_IDs = ['1','2','3','4','5','6']
     # Type of preprocessing/features to extract
-    # preprocessing_types = ['delta', 'theta', 'alpha', 'beta', 'lowgamma', 'highgamma', 'allbands']
-    preprocessing_types = ['CAR', 'raw']
+    preprocessing_types = ['delta', 'theta', 'alpha', 'beta', 'lowgamma', 'highgamma', 'allbands']
+    # preprocessing_types = ['CAR', 'raw']
     # Define which classifiers to experiment with: 'STMF' / 'SVM' / 'RF' / 'EEGNet'
-    classifiers = ['EEGNet']
+    classifiers = ['SVM', 'STMF']
     
     # What to execute
     preprocess = False
@@ -243,3 +243,14 @@ if __name__ == '__main__':
     # TODO:
     # - Figure out how to deal with interpretation of results: rest class might be 100% accurate and influence total accuracy
     #       Maybe use F1 score, or visualize confusion matrix, but that's not possible to do for all experiments
+    # - Find better way to store results
+    #       Might be better to put in classifier (base?) class
+    #       'Add results' functionality needed with how results are currently stored
+    #       Might be better to store y_pred and y_true, to be able to reconstruct CM from stored results
+    # - Find a way to visualize results/accuracies
+    #       Barplot for each classifier with on x-axis patients grouped by feature type
+    #           But then it's hard to compare classifiers probably
+
+    # - Start implementation of EEGNet to pretrain on active vs. rest
+    # - Try EEGNet in PyTorch
+    
