@@ -136,24 +136,25 @@ def classification_loop(patient_IDs,
                         n_experiments,
                         sampling_rate,
                         trial_window_start,
-                        trial_window_stop):
+                        trial_window_stop,
+                        save_results):
     # Create dict to store accuracies 
     # (in lists for possibility to average over multiple experiments)
     accuracies = dict()
     # Start classification loop
     for classifier in classifiers:
         accuracies[classifier] = dict()
-        for pID in patient_IDs:
-            patient_data = PatientDataMapper(pID)
-            accuracies[classifier][patient_data.patient] = dict()
-            for preprocessing_type in preprocessing_types:
+        for preprocessing_type in preprocessing_types:
+            accuracies[classifier][preprocessing_type] = dict()
+            for pID in patient_IDs:
+                patient_data = PatientDataMapper(pID)
                 # Path where trials should be/are stored
                 trials_path = f'data/{patient_data.patient}/{patient_data.patient}_{preprocessing_type}_trials.pkl'
                 # Define mapping from indices to labels (differs per patient)
                 labelsdict = {patient_data.label_indices[i]: labels[i] for i in range(len(labels))}
                 # Load (preprocessed) trials for specific patient
                 X, y = load_trials(trials_path)
-                accuracies[classifier][patient_data.patient][preprocessing_type] = []
+                accuracies[classifier][preprocessing_type][patient_data.patient] = []
                 for i in range(n_experiments):
                     print(f'\nRepetition {i+1} using \'{preprocessing_type}\' trials from patient \'{pID}\'')
                     print(f'Classification with {classifier}...')
@@ -167,18 +168,56 @@ def classification_loop(patient_IDs,
                                               LOO=True,
                                               plot_cm=False, 
                                               test_index=None)
-                    accuracies[classifier][patient_data.patient][preprocessing_type].append(accuracy)
+                    accuracies[classifier][preprocessing_type][patient_data.patient].append(accuracy)
+                if save_results:
+                    directory = f'results/{classifier}/{preprocessing_type}'
+                    if not os.path.exists(directory):
+                        os.makedirs(directory)
+                    file = f'{directory}/{patient_data.patient}_results.pkl'
+                    with open(file, 'wb+') as f:
+                        pkl.dump(accuracies[classifier][preprocessing_type][patient_data.patient], f)
     return accuracies
 
 def print_results(accuracies, n_experiments):
     # Accuracies is dictionary with [classifier][patient][preprocessing_type]
-    print(f'\n\nAverage accuracies (over {n_experiments} runs)\n')
-    for classifier, patient_dict in accuracies.items():
-        print(f'{classifier}')
-        for patient, processing_dict in patient_dict.items():
-            for processing, all_accs in processing_dict.items():
+    print(f'\n\nAverage accuracies (over {n_experiments} runs)')
+    for classifier, processing_dict in accuracies.items():
+        print(f'\n{classifier}')
+        for processing, patient_dict in processing_dict.items():
+            for patient, all_accs in patient_dict.items():
                 all_accs = np.array(all_accs)
                 print(f'{patient}-{processing}:\t{np.mean(all_accs)} ({np.std(all_accs)})')
+
+def plot_features_results(classifiers, preprocessing_types, patients_IDs):
+    # Define plot variables
+    patient_labels = []
+    for patient_ID in patient_IDs:
+        patient_labels.append(PatientDataMapper(patient_ID).patient)
+    x_axis = np.arange(len(patient_IDs))
+    width = 0.1
+    pos = [-.3, -.2, -.1, 0, .1, .2, .3]
+    # Read all result data
+    for classifier in classifiers:
+        all_data = []
+        for preprocessing_type in preprocessing_types:
+            data = []
+            directory = f'results/{classifier}/{preprocessing_type}'
+            for patient_ID in patient_IDs:
+                patient_data = PatientDataMapper(patient_ID)
+                file = f'{directory}/{patient_data.patient}_results.pkl'
+                with open(file, 'rb') as f:
+                    results = np.mean(pkl.load(f))
+                data.append(results)
+            all_data.append(data) # Patients x Preprocessing_types
+        # Barplot
+        plt.figure(figsize=(8,6))
+        for i, data in enumerate(all_data):
+            plt.bar(x_axis + pos[i], data, width=width, label=preprocessing_types[i])
+        plt.title(f'Accuracy of {classifier}')
+        plt.xticks(x_axis, patient_labels)
+        plt.legend()
+        plt.show()
+
 
 
 if __name__ == '__main__':
@@ -199,13 +238,13 @@ if __name__ == '__main__':
     preprocessing_types = ['delta', 'theta', 'alpha', 'beta', 'lowgamma', 'highgamma', 'allbands']
     # preprocessing_types = ['CAR', 'raw']
     # Define which classifiers to experiment with: 'STMF' / 'SVM' / 'RF' / 'EEGNet'
-    classifiers = ['SVM', 'STMF']
+    classifiers = ['STMF', 'SVM']
     
-    # What to execute
+    # Which functionalities to execute
     preprocess = False
     create_trials = False
-    classify = True
-    save_results = True
+    classify = False
+    save_results = False
     
     if preprocess:
         for pID in patient_IDs:
@@ -224,23 +263,21 @@ if __name__ == '__main__':
     if classify:
         # Number of experiments to average accuracy over 
         # (only useful for non-deterministic classifiers)
-        n_experiments = 1
+        n_experiments = 10
         accuracies = classification_loop(patient_IDs, 
                                         preprocessing_types,
                                         classifiers,
                                         n_experiments,
                                         sampling_rate,
                                         trial_window_start,
-                                        trial_window_stop)
+                                        trial_window_stop,
+                                        save_results)
         print_results(accuracies, n_experiments)
-        if save_results:
-            for classifier in accuracies:
-                file = f'results/{classifier}/{classifier}_results.pkl'
-                with open(file, 'wb') as f:
-                    pkl.dump(accuracies[classifier], f)
 
+    plot_features_results(classifiers, preprocessing_types, patient_IDs)
 
     # TODO:
+    # - Check if batch size matters for EEGNet(?)
     # - Figure out how to deal with interpretation of results: rest class might be 100% accurate and influence total accuracy
     #       Maybe use F1 score, or visualize confusion matrix, but that's not possible to do for all experiments
     # - Find better way to store results
@@ -251,6 +288,7 @@ if __name__ == '__main__':
     #       Barplot for each classifier with on x-axis patients grouped by feature type
     #           But then it's hard to compare classifiers probably
 
+    # - Interpretation of kernel weights EEGNet
     # - Start implementation of EEGNet to pretrain on active vs. rest
     # - Try EEGNet in PyTorch
     
