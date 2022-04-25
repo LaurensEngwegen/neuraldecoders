@@ -47,14 +47,15 @@ class Trials_Creator():
         return task_data
 
     def downsample_data(self, data, old_sampling_rate):
-        # Take downsampling into account for QOT and VOT
+        # Take downsampling into account for COT and VOT
         for i in range(data.shape[1]):
-            data[0, i] /= int(old_sampling_rate/self.sampling_rate)
+            # data[0, i] /= int(old_sampling_rate/self.sampling_rate)
+            data[0, i] = int(data[0, i] / (old_sampling_rate/self.sampling_rate))
             if data[1, i] != 0 and data[1, i] != -1:
-                data[1, i] /= int(old_sampling_rate/self.sampling_rate)
+                data[1, i] = int(data[1, i] / (old_sampling_rate/self.sampling_rate))
         # And for offset
         for i in range(len(self.offset)):
-            self.offset[i] /= int(old_sampling_rate/self.sampling_rate)
+            self.offset[i] = int(self.offset[i] / (old_sampling_rate/self.sampling_rate))
         return data
 
     def VOT_correction(self, breakpoints):
