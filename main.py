@@ -70,7 +70,7 @@ def classification(classifier,
                    trial_window_start, 
                    trial_window_stop, 
                    LOO=False,
-                   plot_cm=False, 
+                   make_plots=False, 
                    test_index=None):
     # Classification with STMF
     if classifier == 'STMF':
@@ -79,7 +79,7 @@ def classification(classifier,
             stmf_cls.single_classification(test_index)
             accuracy = -1
         if LOO:
-            accuracy = stmf_cls.LOO_classification(plot_cm, plot_HFB=False)
+            accuracy = stmf_cls.LOO_classification(plot_cm=make_plots, plot_HFB=make_plots)
 
     # Classification with a support vector machine
     elif classifier == 'SVM':
@@ -88,7 +88,7 @@ def classification(classifier,
             svm.single_classification(test_index)
             accuracy = -1
         if LOO:
-            accuracy = svm.LOO_classification(plot_cm)
+            accuracy = svm.LOO_classification(make_plots)
 
     # Classification with a random forest
     elif classifier == 'RF':
@@ -97,7 +97,7 @@ def classification(classifier,
             rf.single_classification(test_index)
             accuracy = -1
         if LOO:
-            accuracy = rf.LOO_classification(plot_cm)
+            accuracy = rf.LOO_classification(make_plots)
 
     # Classification with EEGNet in TensorFlow
     elif classifier == 'EEGNet':
@@ -118,7 +118,7 @@ def classification(classifier,
             eegnet_tf.single_classification(test_index)
             accuracy = -1
         if LOO:
-            accuracy = eegnet_tf.LOO_classification(plot_cm)
+            accuracy = eegnet_tf.LOO_classification(make_plots)
 
     # Classification with EEGNet in PyTorch
     # eegnet_torch = EEGNet_torch_Classifier(X, y, labels)
@@ -166,7 +166,7 @@ def classification_loop(patient_IDs,
                                               trial_window_start,
                                               trial_window_stop, 
                                               LOO=True,
-                                              plot_cm=False, 
+                                              make_plots=True, 
                                               test_index=None)
                     accuracies[classifier][preprocessing_type][patient_data.patient].append(accuracy)
                 if save_results:
@@ -176,6 +176,7 @@ def classification_loop(patient_IDs,
                     file = f'{directory}/{patient_data.patient}_results.pkl'
                     with open(file, 'wb+') as f:
                         pkl.dump(accuracies[classifier][preprocessing_type][patient_data.patient], f)
+                    print(f'Results stored in \'{file}\'')
     return accuracies
 
 def print_results(accuracies, n_experiments):
@@ -215,7 +216,9 @@ def plot_features_results(classifiers, preprocessing_types, patients_IDs):
             plt.bar(x_axis + pos[i], data, width=width, label=preprocessing_types[i])
         plt.title(f'Accuracy of {classifier}')
         plt.xticks(x_axis, patient_labels)
+        plt.yticks(np.arange(0,1.01,0.1))
         plt.legend()
+        plt.grid(alpha=0.35)
         plt.show()
 
 
@@ -233,18 +236,21 @@ if __name__ == '__main__':
     labels = ['/p/', '/oe/', '/a/', '/k/', 'Rest']
     
     # Patient data to use
-    patient_IDs = ['1','2','3','4','5','6']
+    patient_IDs = ['4']
     # Type of preprocessing/features to extract
     preprocessing_types = ['delta', 'theta', 'alpha', 'beta', 'lowgamma', 'highgamma', 'allbands']
-    # preprocessing_types = ['CAR', 'raw']
+    # preprocessing_types = ['CAR']
     # Define which classifiers to experiment with: 'STMF' / 'SVM' / 'RF' / 'EEGNet'
     classifiers = ['STMF', 'SVM']
+    # Number of experiments to average accuracy over 
+    # (only useful for non-deterministic classifiers)
+    n_experiments = 1
     
     # Which functionalities to execute
-    preprocess = False
-    create_trials = False
-    classify = False
-    save_results = False
+    preprocess = True
+    create_trials = True
+    classify = True
+    save_results = True
     
     if preprocess:
         for pID in patient_IDs:
@@ -261,9 +267,6 @@ if __name__ == '__main__':
                             create_trials=create_trials)
     
     if classify:
-        # Number of experiments to average accuracy over 
-        # (only useful for non-deterministic classifiers)
-        n_experiments = 10
         accuracies = classification_loop(patient_IDs, 
                                         preprocessing_types,
                                         classifiers,
@@ -274,7 +277,7 @@ if __name__ == '__main__':
                                         save_results)
         print_results(accuracies, n_experiments)
 
-    plot_features_results(classifiers, preprocessing_types, patient_IDs)
+    # plot_features_results(classifiers, preprocessing_types, patient_IDs)
 
     # TODO:
     # - Check if batch size matters for EEGNet(?)

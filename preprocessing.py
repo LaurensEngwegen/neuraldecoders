@@ -146,7 +146,7 @@ class Preprocessor():
 
     def CAR(self, data, CAR_channels):
         # Comman Average Referencing
-        print(f'CAR...')
+        print(f'Common average referencing...')
         # Use all channels
         if CAR_channels is None:
             car_data = data - np.mean(data, 0)
@@ -171,6 +171,8 @@ class Preprocessor():
         }
         if self.preprocessing_type == 'allbands':
             freqs = [freq_bands['delta'], freq_bands['theta'], freq_bands['alpha'], freq_bands['beta'], freq_bands['lowgamma'], freq_bands['highgamma']]
+        elif self.preprocessing_type == 'lowband':
+            freqs = [np.arange(1,31)]
         else:
             freqs = [freq_bands[self.preprocessing_type]]
             
@@ -198,7 +200,6 @@ class Preprocessor():
         '''
         return np.array(response_spectra)
 
-    # TODO: make compatible for new response spectra (with n frequency bands)
     def z_score_spectra(self, spectra):
         print(f'Z-scoring spectra...')
         # Spectra: E x B x T
@@ -213,7 +214,6 @@ class Preprocessor():
                     (spectra[:, freq_band, np.arange(self.break_points[i], self.break_points[i+1])] - np.mean(chunk)) / np.std(chunk)
         return spectra
 
-    # TODO: make compatible for new response spectra (with n frequency bands)
     def smooth_spectra(self, data):
         # Smoothing
         smooth_window = 0.1 # seconds
