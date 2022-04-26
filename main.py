@@ -1,3 +1,4 @@
+from matplotlib.axis import XAxis
 from patient_data_mapping import PatientDataMapper
 from preprocessing import Preprocessor
 from trials_creation import Trials_Creator
@@ -223,6 +224,44 @@ def plot_features_results(classifiers, preprocessing_types, patient_IDs):
         plt.show()
 
 
+def plot_classifier_results(patient_IDs):
+    result_info = {
+        'STMF': 'highgamma',
+        'SVM': 'highgamma',
+        'EEGNet': 'CAR'
+    }
+
+    patient_labels = []
+    for patient_ID in patient_IDs:
+        patient_labels.append(PatientDataMapper(patient_ID).patient)
+    x_axis = np.arange(len(patient_IDs))
+    pos = [-0.2, 0, 0.2]
+    width = 0.2
+
+    all_accs, all_stds = [], []
+    for classifier, preprocessing_type in result_info.items():
+        accs, stds = [], []
+        directory = f'results/{classifier}/{preprocessing_type}'
+        for patient in patient_labels:
+            file = f'{directory}/{patient}_results.pkl'
+            with open(file, 'rb') as f:
+                results = pkl.load(f)
+            acc = np.mean(results)
+            std = np.std(results)
+            accs.append(acc)
+            stds.append(std)
+        all_accs.append(accs)
+        all_stds.append(stds)
+
+    plt.figure(figsize=(8,6))
+    for i, accuracies in enumerate(all_accs):
+        plt.bar(x_axis+pos[i], accuracies, yerr=all_stds[i], width=width, label=list(result_info)[i])
+    plt.title(f'Accuracy of different classifiers')
+    plt.xticks(x_axis, patient_labels)
+    plt.yticks(np.arange(0,1.01,0.1))
+    plt.legend()
+    plt.grid(alpha=0.35)
+    plt.show()
 
 if __name__ == '__main__':
     # Sampling rate of signal
@@ -247,12 +286,12 @@ if __name__ == '__main__':
     # (only useful for non-deterministic classifiers)
     n_experiments = 1
     
-    # Which functionalities to execute
-    preprocess = True
-    create_trials = True
-    classify = True
+    # Which functionalities to execute (True/False)
+    preprocess = False
+    create_trials = False
+    classify = False
     make_plots = False
-    save_results = True
+    save_results = False
     
     if preprocess:
         for pID in patient_IDs:
@@ -280,7 +319,8 @@ if __name__ == '__main__':
                                         save_results)
         print_results(accuracies, n_experiments)
 
-    plot_features_results(classifiers, preprocessing_types, patient_IDs)
+    # plot_features_results(classifiers, preprocessing_types, patient_IDs)
+    plot_classifier_results(patient_IDs)
 
     # TODO:
     # - Check if batch size matters for EEGNet(?)
@@ -290,10 +330,7 @@ if __name__ == '__main__':
     #       Might be better to put in classifier (base?) class
     #       'Add results' functionality needed with how results are currently stored
     #       Might be better to store y_pred and y_true, to be able to reconstruct CM from stored results
-    # - Find a way to visualize results/accuracies
-    #       Barplot for each classifier with on x-axis patients grouped by feature type
-    #           But then it's hard to compare classifiers probably
-    # - Add a print with n_channels and n_trials for classification
+    # - Add a print with n_channels and n_trials before classification
     # - Interpretation of kernel weights EEGNet
     # - Start implementation of EEGNet to pretrain on active vs. rest
     # - Try EEGNet in PyTorch
