@@ -137,6 +137,7 @@ def classification_loop(patient_IDs,
                         sampling_rate,
                         trial_window_start,
                         trial_window_stop,
+                        make_plots,
                         save_results):
     # Create dict to store accuracies 
     # (in lists for possibility to average over multiple experiments)
@@ -166,7 +167,7 @@ def classification_loop(patient_IDs,
                                               trial_window_start,
                                               trial_window_stop, 
                                               LOO=True,
-                                              make_plots=True, 
+                                              make_plots=make_plots, 
                                               test_index=None)
                     accuracies[classifier][preprocessing_type][patient_data.patient].append(accuracy)
                 if save_results:
@@ -189,7 +190,7 @@ def print_results(accuracies, n_experiments):
                 all_accs = np.array(all_accs)
                 print(f'{patient}-{processing}:\t{np.mean(all_accs)} ({np.std(all_accs)})')
 
-def plot_features_results(classifiers, preprocessing_types, patients_IDs):
+def plot_features_results(classifiers, preprocessing_types, patient_IDs):
     # Define plot variables
     patient_labels = []
     for patient_ID in patient_IDs:
@@ -236,10 +237,10 @@ if __name__ == '__main__':
     labels = ['/p/', '/oe/', '/a/', '/k/', 'Rest']
     
     # Patient data to use
-    patient_IDs = ['4']
+    patient_IDs = ['1','2','3','4','5','6','7']
     # Type of preprocessing/features to extract
-    preprocessing_types = ['delta', 'theta', 'alpha', 'beta', 'lowgamma', 'highgamma', 'allbands']
-    # preprocessing_types = ['CAR']
+    # preprocessing_types = ['delta', 'theta', 'alpha', 'beta', 'lowgamma', 'highgamma', 'allbands']
+    preprocessing_types = ['broadband40-150', 'articleHFB']
     # Define which classifiers to experiment with: 'STMF' / 'SVM' / 'RF' / 'EEGNet'
     classifiers = ['STMF', 'SVM']
     # Number of experiments to average accuracy over 
@@ -250,6 +251,7 @@ if __name__ == '__main__':
     preprocess = True
     create_trials = True
     classify = True
+    make_plots = False
     save_results = True
     
     if preprocess:
@@ -274,10 +276,11 @@ if __name__ == '__main__':
                                         sampling_rate,
                                         trial_window_start,
                                         trial_window_stop,
+                                        make_plots,
                                         save_results)
         print_results(accuracies, n_experiments)
 
-    # plot_features_results(classifiers, preprocessing_types, patient_IDs)
+    plot_features_results(classifiers, preprocessing_types, patient_IDs)
 
     # TODO:
     # - Check if batch size matters for EEGNet(?)
@@ -290,7 +293,7 @@ if __name__ == '__main__':
     # - Find a way to visualize results/accuracies
     #       Barplot for each classifier with on x-axis patients grouped by feature type
     #           But then it's hard to compare classifiers probably
-
+    # - Add a print with n_channels and n_trials for classification
     # - Interpretation of kernel weights EEGNet
     # - Start implementation of EEGNet to pretrain on active vs. rest
     # - Try EEGNet in PyTorch

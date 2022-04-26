@@ -126,11 +126,10 @@ class Preprocessor():
         print(f'Downsampling from {old_sampling_rate}Hz to {self.sampling_rate}Hz...')
         downsampled_data = []
         n_samples = int(data.shape[1] / (old_sampling_rate/self.sampling_rate))
-        for channel in range(data.shape[0]):
+        for channel in tqdm(range(data.shape[0])):
             downsampled_data.append(scipy.signal.resample(data[channel], n_samples))
-
+        # Also correctly downsample break- and valid points
         breakpoints = [int(self.break_points[i]/(old_sampling_rate/self.sampling_rate)) for i in range(len(self.break_points))]
-
         valid_points = []
         for i in range(len(breakpoints)-1):
             for j in range(breakpoints[i]+self.buffer, breakpoints[i+1]-self.buffer):
@@ -171,8 +170,10 @@ class Preprocessor():
         }
         if self.preprocessing_type == 'allbands':
             freqs = [freq_bands['delta'], freq_bands['theta'], freq_bands['alpha'], freq_bands['beta'], freq_bands['lowgamma'], freq_bands['highgamma']]
-        elif self.preprocessing_type == 'lowband':
-            freqs = [np.arange(1,31)]
+        elif self.preprocessing_type == 'broadband40-150':
+            freqs = [np.arange(40,151)]
+        elif self.preprocessing_type == 'articleHFB':
+            freqs = [np.arange(65,126)]
         else:
             freqs = [freq_bands[self.preprocessing_type]]
             
