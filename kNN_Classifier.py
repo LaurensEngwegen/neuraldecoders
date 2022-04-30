@@ -5,7 +5,7 @@ from sklearn.metrics import ConfusionMatrixDisplay
 from tqdm import tqdm
 
 class kNN_Classifier():
-    def __init__(self, X, y, labelsdict, n_neighbors=9):
+    def __init__(self, X, y, labelsdict, n_neighbors=5):
         X = X.squeeze()
         X_second_dim = 1
         for i in range(1, len(X.shape)):
