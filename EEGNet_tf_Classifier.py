@@ -129,6 +129,7 @@ class EEGNet_tf_Classifier():
             # print(f"{i}. True - predicted ==> {y_true} - {y_pred}")
             if y_pred == y_true:
                 correct += 1
+            # K.clear_session()
         accuracy = correct/len(self.y)
         print(f'Accuracy = {accuracy}')
         print(f'correct: {correct}, len(y): {len(self.y)}')

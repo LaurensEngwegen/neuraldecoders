@@ -8,91 +8,114 @@ import matplotlib.pyplot as plt
 from sklearn.metrics import ConfusionMatrixDisplay
 from tqdm import tqdm
 
+class constrainedConv2d(nn.Conv2d):
+    # CALL THIS FUNCTION AFTER EACH OPTIMIZAITON STEP
+    def max_norm(self, max_norm_val):
+        norm = self.weight.norm(2, dim=0, keepdim=True)
+        desired = torch.clamp(norm, 0, max_norm_val)
+        # print(f'\n\n\nmax_norm makes it:\n{self.weight * (desired / (1e-7 + norm))}\n')
+        self.weight = nn.Parameter(self.weight * (desired / (1e-14 + norm)))
+
+class constrainedLinear(nn.Linear):
+    # CALL THIS FUNCTION AFTER EACH OPTIMIZAITON STEP
+    def max_norm(self, max_norm_val):
+        norm = self.weight.norm(2, dim=0, keepdim=True)
+        desired = torch.clamp(norm, 0, max_norm_val)
+        # print(f'\n\n\nmax_norm makes it:\n{self.weight * (desired / (1e-7 + norm))}\n')
+        self.weight = nn.Parameter(self.weight * (desired / (1e-14 + norm)))
 
 
 class EEGNet_torch_Classifier(nn.Module):
-    def __init__(self, X, y, labels, optimizer=optim.Adam, loss=nn.CrossEntropyLoss):
+    def __init__(self, X, y, labelsdict, 
+                 n_channels,
+                 n_samples,
+                 dropoutRate=0.5,
+                 kernLength=256,
+                 F1=8,
+                 D=2,
+                 F2=16,
+                 norm1=1,
+                 norm2=0.25,
+                 optimizer=optim.Adam, 
+                 loss=nn.CrossEntropyLoss):
         super(EEGNet_torch_Classifier, self).__init__()
-        '''
-        self.T = samples_per_trial
-        
-        # Layer 1
-        self.conv1 = nn.Conv2d(1, 16, (1, sampling_rate/2), padding=0)
-        self.batchnorm1 = nn.BatchNorm2d(16, False)
-        
-        # Layer 2
-        self.padding1 = nn.ZeroPad2d((16, 17, 0, 1))
-        self.conv2 = nn.Conv2d(1, 4, (2, 32))
-        self.batchnorm2 = nn.BatchNorm2d(4, False)
-        self.pooling2 = nn.MaxPool2d(2, 4)
-        
-        # Layer 3
-        self.padding2 = nn.ZeroPad2d((2, 1, 4, 3))
-        self.conv3 = nn.Conv2d(4, 4, (8, 4))
-        self.batchnorm3 = nn.BatchNorm2d(4, False)
-        self.pooling3 = nn.MaxPool2d((2, 4))
-        
-        # FC Layer
-        # NOTE: This dimension will depend on the number of timestamps per sample in your data.
-        # I have 120 timepoints. 
-        self.fc1 = nn.Linear(4*2*7, 1)
-        '''
+    
         self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
         print(f'Device: {self.device}')
         
         self.X = torch.from_numpy(X).to(self.device)
-        # TODO: make generalizable for more/less classes
-        self.y = np.zeros((len(y), 5)) # 5 classes
-        for i in range(len(y)):
-            label = y[i]
-            self.y[i,label-1] = 1
-        self.y = torch.from_numpy(self.y).to(self.device)
 
-        self.labels = labels
-        self.id2label = dict()
-        for i in range(len(self.labels)):
-            self.id2label[i+1] = self.labels[i]
+        # self.y = np.zeros((len(y), 5)) # 5 classes
+        # for i in range(len(y)):
+        #     label = y[i]
+        #     self.y[i,label-1] = 1
+        # self.y = torch.from_numpy(self.y).to(self.device)
+        self.y = y
+
+        self.labels = []
+        for i, (id, label) in enumerate(labelsdict.items()):
+            self.labels.append(label)
+            self.y = np.where(y==id, i, self.y)
+        # print(self.y)
+        self.y = np.eye(len(np.unique(self.y)))[self.y]
+        self.y = torch.from_numpy(self.y).to(self.device)
+        # print(self.y)
+        self.id2label = labelsdict
+        self.n_classes = len(self.labels)
+
+        self.kernLength = kernLength
+        self.n_channels = n_channels
+        self.n_samples = n_samples
+        self.F1 = F1
+        self.D = D
+        self.F2 = F2
+        self.dropout_rate = dropoutRate
+        self.norm1 = norm1
+        self.norm2 = norm2
 
         self.optimizer = optimizer
         self.loss = loss
 
-
-    def initialize_model(self,
-                         n_classes = 5,
-                         channels = 60,
-                         sampling_rate = 512,
-                         F1 = 8,
-                         D = 2,
-                         F2 = 16,
-                         dropout_rate = 0.5):
+    def initialize_model(self):
         
         self.layers = []
 
-        self.layers.append(nn.Conv2d(1, F1, (1, int(sampling_rate/2)), padding='same', bias=False))
+        # Temporal
+        self.layers.append(nn.Conv2d(1, self.F1, (1, self.kernLength), padding='same', bias=False))
         # self.layers.append(nn.BatchNorm2d(F1, False))
         
         # Depthwise
-        # TODO: add depthwise_constraint = maxnorm(1.0)
-        self.layers.append(nn.Conv2d(F1, F1*D, (channels, 1), padding='valid', groups=F1, bias=False))
+        self.layers.append(constrainedConv2d(in_channels=self.F1, 
+                                     out_channels=self.F1*self.D, 
+                                     kernel_size=(self.n_channels, 1), 
+                                     padding='valid', 
+                                     groups=self.F1, 
+                                     bias=False))
         # self.layers.append(nn.BatchNorm2d(..., False))
-
         self.layers.append(nn.ELU())
         self.layers.append(nn.AvgPool2d((1,4)))
-        self.layers.append(nn.Dropout(dropout_rate))
+        self.layers.append(nn.Dropout(self.dropout_rate))
 
         # Separable (= depthwise+pointwise)
-        self.layers.append(nn.Conv2d(F1*D, F1*D, (1,16), padding='same', groups=F1*D, bias=False))
-        self.layers.append(nn.Conv2d(F1*D, F2, (1,1), padding='same', bias=False))
+        self.layers.append(nn.Conv2d(self.F1*self.D, 
+                                     self.F1*self.D, 
+                                     (1,16), 
+                                     padding='same', 
+                                     groups=self.F1*self.D, 
+                                     bias=False))
+        self.layers.append(nn.Conv2d(self.F1*self.D, 
+                                     self.F2, 
+                                     (1,1), 
+                                     padding='same', 
+                                     bias=False))
         # self.layers.append(nn.BatchNorm2d(..., False))
-
         self.layers.append(nn.ELU())
         self.layers.append(nn.AvgPool2d((1,8)))
-        self.layers.append(nn.Dropout(dropout_rate))
+        self.layers.append(nn.Dropout(self.dropout_rate))
 
         # Flatten, linear, softmax
         self.layers.append(nn.Flatten(0))
-        # TODO: add kernel constraint
-        self.layers.append(nn.Linear(256, n_classes))
+        self.layers.append(constrainedLinear(int(self.F2*self.n_samples/32), self.n_classes))
         self.layers.append(nn.Softmax())
 
         self.model = nn.ModuleList(self.layers).double()
@@ -119,17 +142,18 @@ class EEGNet_torch_Classifier(nn.Module):
             epoch_loss = 0
             for X, y in zip(X_train, y_train):
                 optimizer.zero_grad()
-                X = X[None, :] # Needed when batchsize=1
-
-                
+                X = X[None, :] # Needed when unbatched
                 y = y[None, :]
                 # y = argmax eerst
-
                 output = self.forward(X)
+                # print(output)
                 output = output[None, :]
                 loss = lossfunction(output, y)
                 loss.backward()
                 optimizer.step()
+                self.layers[1].max_norm(self.norm1)
+                self.layers[11].max_norm(self.norm2)
+
                 epoch_loss += loss
             epoch_loss = epoch_loss/X_train.shape[0]
             if verbose:
@@ -174,3 +198,4 @@ class EEGNet_torch_Classifier(nn.Module):
         if plot_cm:
             ConfusionMatrixDisplay.from_predictions(y_trues.cpu(), y_preds.cpu(), display_labels=self.labels)
             plt.show()
+        return correct/len(self.y)
