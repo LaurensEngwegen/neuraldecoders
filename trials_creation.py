@@ -82,6 +82,8 @@ class Trials_Creator():
                     # task_data[1,i] = -1+self.offset
 
         # Drop bad trials indicated with -1
+        print(f'Number of bad (-1) trials: {task_data[:, task_data[1, :] == -1].shape[1]}')
+        print(f'Number of trials with -1 in column 3: {task_data[:, task_data[2, :] == -1].shape[1]}')
         task_data = task_data[:, task_data[1,:] != -1]
         # Drop too early trials
         valid_points = np.isin(task_data[0,:]+round(self.time_window_start*self.sampling_rate), valid_spectra_points)
