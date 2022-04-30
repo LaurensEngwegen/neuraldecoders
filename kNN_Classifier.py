@@ -1,12 +1,11 @@
+import pstats
 import matplotlib.pyplot as plt
-from sklearn.svm import SVC
+from sklearn.neighbors import KNeighborsClassifier
 from sklearn.metrics import ConfusionMatrixDisplay
 from tqdm import tqdm
 
-
-class SVM_Classifier():
-    def __init__(self, X, y, labelsdict, kernel='linear'):
-        # self.X = X
+class kNN_Classifier():
+    def __init__(self, X, y, labelsdict, n_neighbors=9):
         X = X.squeeze()
         X_second_dim = 1
         for i in range(1, len(X.shape)):
@@ -17,10 +16,11 @@ class SVM_Classifier():
         for _, label in labelsdict.items():
             self.labels.append(label)
         self.id2label = labelsdict
-        self.kernel = kernel
 
+        self.n_neighbors = n_neighbors
+    
     def train(self, X_train, y_train):
-        self.clf = SVC(kernel=self.kernel)
+        self.clf = KNeighborsClassifier(n_neighbors=self.n_neighbors)
         self.clf.fit(X_train, y_train)
 
     def predict(self, X_test):
@@ -53,3 +53,4 @@ class SVM_Classifier():
             ConfusionMatrixDisplay.from_predictions(y_trues, y_preds, display_labels=self.labels)
             plt.show()
         return accuracy
+

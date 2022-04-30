@@ -1,9 +1,9 @@
-from matplotlib.axis import XAxis
 from patient_data_mapping import PatientDataMapper
 from preprocessing import Preprocessor
 from trials_creation import Trials_Creator
 from STMF_Classifier import STMF_Classifier
 from SVM_Classifier import SVM_Classifier
+from kNN_Classifier import kNN_Classifier
 from RF_Classifier import RF_Classifier
 from EEGNet_tf_Classifier import EEGNet_tf_Classifier
 from EEGNet_torch_Classifier import EEGNet_torch_Classifier
@@ -91,6 +91,15 @@ def classification(classifier,
         if LOO:
             accuracy = svm.LOO_classification(make_plots)
 
+    # Classification on basis of k nearest neighbours
+    elif classifier == 'kNN':
+        kNN = kNN_Classifier(X, y, labelsdict)
+        if test_index is not None:
+            kNN.single_classification(test_index)
+            accuracy = -1
+        if LOO:
+            accuracy = kNN.LOO_classification(make_plots)
+
     # Classification with a random forest
     elif classifier == 'RF':
         rf = RF_Classifier(X, y, labelsdict)
@@ -101,18 +110,28 @@ def classification(classifier,
             accuracy = rf.LOO_classification(make_plots)
 
     # Classification with EEGNet in TensorFlow
-    elif classifier == 'EEGNet':
+    elif classifier == 'EEGNet' or classifier == 'EEGNet4-2' or classifier == 'EEGNet16-2':
         # Hyperparameters of EEGNet
         eegnet_kwargs = {
             'n_samples': int((trial_window_stop-trial_window_start) * sampling_rate),
             'dropoutRate': 0.5,
             'kernLength': int(sampling_rate/2),
-            'F1': 8, # default: 8
-            'D': 2, # default: 2
-            'F2': 16, # default: 16
             'norm_rate': 0.25, 
             'dropoutType': 'Dropout'
         }
+        # Default EEGNet8-2
+        if classifier == 'EEGNet':
+            eegnet_kwargs['F1'] = 8
+            eegnet_kwargs['D'] = 2
+            eegnet_kwargs['F2'] = 16
+        elif classifier == 'EEGNet4-2':
+            eegnet_kwargs['F1'] = 4
+            eegnet_kwargs['D'] = 2
+            eegnet_kwargs['F2'] = 8
+        else: # EEGNet16-2
+            eegnet_kwargs['F1'] = 16
+            eegnet_kwargs['D'] = 2
+            eegnet_kwargs['F2'] = 32
         eegnet_tf = EEGNet_tf_Classifier(X, y, labelsdict, n_channels=X.shape[1], **eegnet_kwargs)
         # print(eegnet_tf.initialize_model().summary())
         if test_index is not None:
@@ -122,13 +141,24 @@ def classification(classifier,
             accuracy = eegnet_tf.LOO_classification(make_plots)
 
     # Classification with EEGNet in PyTorch
-    # eegnet_torch = EEGNet_torch_Classifier(X, y, labels)
-    # eegnet_torch.initialize_model()
-    # print(eegnet_torch.model)
-    # if test_index is not None:
-    #     eegnet_torch.single_classification(i)
-    # eegnet_torch.LOO_classification()
-
+    elif classifier == 'EEGNet_torch':
+        # Hyperparameters of EEGNet
+        eegnet_kwargs = {
+            'n_samples': int((trial_window_stop-trial_window_start) * sampling_rate),
+            'dropoutRate': 0.5,
+            'kernLength': int(sampling_rate/2),
+            'F1': 8,
+            'D': 2, 
+            'F2': 16,
+            'norm1': 1.0,
+            'norm2': 0.25
+        }
+        eegnet = EEGNet_torch_Classifier(X, y, labelsdict, n_channels=X.shape[1], **eegnet_kwargs)
+        if test_index is not None:
+            eegnet.single_classification(test_index)
+            accuracy = -1
+        if LOO:
+            accuracy = eegnet.LOO_classification(make_plots)
     return accuracy
 
 def classification_loop(patient_IDs,
@@ -139,7 +169,9 @@ def classification_loop(patient_IDs,
                         trial_window_start,
                         trial_window_stop,
                         make_plots,
-                        save_results):
+                        save_results,
+                        LOO=True,
+                        test_index=None):
     # Create dict to store accuracies 
     # (in lists for possibility to average over multiple experiments)
     accuracies = dict()
@@ -158,7 +190,7 @@ def classification_loop(patient_IDs,
                 X, y = load_trials(trials_path)
                 accuracies[classifier][preprocessing_type][patient_data.patient] = []
                 for i in range(n_experiments):
-                    print(f'\nRepetition {i+1} using \'{preprocessing_type}\' trials from patient \'{pID}\'')
+                    print(f'\nRepetition {i+1} using \'{preprocessing_type}\' trials from patient \'{pID}\' ({X.shape[1]} channels, {X.shape[0]} trials)')
                     print(f'Classification with {classifier}...')
                     accuracy = classification(classifier,
                                               X, 
@@ -167,9 +199,9 @@ def classification_loop(patient_IDs,
                                               sampling_rate,
                                               trial_window_start,
                                               trial_window_stop, 
-                                              LOO=True,
                                               make_plots=make_plots, 
-                                              test_index=None)
+                                              LOO=LOO,
+                                              test_index=test_index)
                     accuracies[classifier][preprocessing_type][patient_data.patient].append(accuracy)
                 if save_results:
                     directory = f'results/{classifier}/{preprocessing_type}'
@@ -198,7 +230,7 @@ def plot_features_results(classifiers, preprocessing_types, patient_IDs):
         patient_labels.append(PatientDataMapper(patient_ID).patient)
     x_axis = np.arange(len(patient_IDs))
     width = 0.1
-    pos = [-.3, -.2, -.1, 0, .1, .2, .3]
+    pos = [-.4, -.3, -.2, -.1, 0, .1, .2, .3, .4]
     # Read all result data
     for classifier in classifiers:
         all_data = []
@@ -263,6 +295,7 @@ def plot_classifier_results(patient_IDs):
     plt.grid(alpha=0.35)
     plt.show()
 
+
 if __name__ == '__main__':
     # Sampling rate of signal
     sampling_rate = 512
@@ -276,12 +309,14 @@ if __name__ == '__main__':
     labels = ['/p/', '/oe/', '/a/', '/k/', 'Rest']
     
     # Patient data to use
-    patient_IDs = ['1','2','3','4','5','6','7']
+    patient_IDs = ['1','2','3','4','5','6','7','8']
+    # patient_IDs = ['1']
     # Type of preprocessing/features to extract
-    # preprocessing_types = ['delta', 'theta', 'alpha', 'beta', 'lowgamma', 'highgamma', 'allbands']
-    preprocessing_types = ['broadband40-150', 'articleHFB']
+    # preprocessing_types = ['highgamma', 'allbands', 'broadband40-150', 'articleHFB']
+    # preprocessing_types = ['delta', 'theta', 'alpha', 'beta', 'lowgamma', 'highgamma', 'allbands', 'broadband40-150', 'articleHFB']
+    preprocessing_types = ['broadband40-150']
     # Define which classifiers to experiment with: 'STMF' / 'SVM' / 'RF' / 'EEGNet'
-    classifiers = ['STMF', 'SVM']
+    classifiers = ['kNN']
     # Number of experiments to average accuracy over 
     # (only useful for non-deterministic classifiers)
     n_experiments = 1
@@ -289,7 +324,7 @@ if __name__ == '__main__':
     # Which functionalities to execute (True/False)
     preprocess = False
     create_trials = False
-    classify = False
+    classify = True
     make_plots = False
     save_results = False
     
@@ -316,22 +351,25 @@ if __name__ == '__main__':
                                         trial_window_start,
                                         trial_window_stop,
                                         make_plots,
-                                        save_results)
+                                        save_results,
+                                        LOO=True)
         print_results(accuracies, n_experiments)
 
     # plot_features_results(classifiers, preprocessing_types, patient_IDs)
-    plot_classifier_results(patient_IDs)
+    # plot_classifier_results(patient_IDs)
 
     # TODO:
+    # - Test multiple k's for k-NN
     # - Check if batch size matters for EEGNet(?)
     # - Figure out how to deal with interpretation of results: rest class might be 100% accurate and influence total accuracy
     #       Maybe use F1 score, or visualize confusion matrix, but that's not possible to do for all experiments
     # - Find better way to store results
     #       Might be better to put in classifier (base?) class
     #       'Add results' functionality needed with how results are currently stored
-    #       Might be better to store y_pred and y_true, to be able to reconstruct CM from stored results
-    # - Add a print with n_channels and n_trials before classification
+    #       >>> Might be better to store y_pred and y_true, to be able to reconstruct CM from stored results
     # - Interpretation of kernel weights EEGNet
     # - Start implementation of EEGNet to pretrain on active vs. rest
     # - Try EEGNet in PyTorch
     
+    # - In patient '4' trials data: 5 trials have -1 at 3rd column that don't have -1 at 2nd column
+    #   while having normal label and normal VOT. Are those bad trials or not? (Not the case for other patients)

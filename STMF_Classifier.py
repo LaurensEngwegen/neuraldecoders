@@ -88,7 +88,6 @@ class STMF_Classifier():
                 for i, electrode in enumerate(hfb):
                     hfb[i] = (electrode - np.mean(electrode)) / np.std(electrode)
         n_electrodes = HFB_perclass[1].shape[0]
-        print(f'nelectrodes: {n_electrodes}')
         # Plot Z-scored HFBs
         fig, ax = plt.subplots(1, 5, figsize=(16,4))
         plt.suptitle('Mean HFB per class')
