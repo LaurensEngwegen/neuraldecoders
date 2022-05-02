@@ -44,6 +44,7 @@ class EEGNet_torch_Classifier(nn.Module):
         print(f'Device: {self.device}')
         
         self.X = torch.from_numpy(X).to(self.device)
+        print(self.X)
 
         # self.y = np.zeros((len(y), 5)) # 5 classes
         # for i in range(len(y)):
@@ -58,8 +59,8 @@ class EEGNet_torch_Classifier(nn.Module):
             self.y = np.where(y==id, i, self.y)
         # print(self.y)
         self.y = np.eye(len(np.unique(self.y)))[self.y]
-        self.y = torch.from_numpy(self.y).to(self.device)
-        # print(self.y)
+        self.y = torch.from_numpy(self.y).to(self.device).float()
+        print(self.y)
         self.id2label = labelsdict
         self.n_classes = len(self.labels)
 
@@ -116,9 +117,9 @@ class EEGNet_torch_Classifier(nn.Module):
         # Flatten, linear, softmax
         self.layers.append(nn.Flatten(0))
         self.layers.append(constrainedLinear(int(self.F2*self.n_samples/32), self.n_classes))
-        self.layers.append(nn.Softmax())
+        # self.layers.append(nn.Softmax())
 
-        self.model = nn.ModuleList(self.layers).double()
+        self.model = nn.ModuleList(self.layers).float()
 
         self.model.to(self.device)
 
@@ -148,7 +149,12 @@ class EEGNet_torch_Classifier(nn.Module):
                 output = self.forward(X)
                 # print(output)
                 output = output[None, :]
-                loss = lossfunction(output, y)
+                print('\n\n\n')
+                print(output)
+                print(y)
+                print(torch.argmax(output))
+                print(torch.argmax(y))
+                loss = lossfunction(torch.argmax(output, dim=1), torch.argmax(y, dim=1))
                 loss.backward()
                 optimizer.step()
                 self.layers[1].max_norm(self.norm1)

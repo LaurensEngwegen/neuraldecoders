@@ -153,7 +153,7 @@ def classification(classifier,
             'norm1': 1.0,
             'norm2': 0.25
         }
-        eegnet = EEGNet_torch_Classifier(X, y, labelsdict, n_channels=X.shape[1], **eegnet_kwargs)
+        eegnet = EEGNet_torch_Classifier(X.astype('float32'), y, labelsdict, n_channels=X.shape[1], **eegnet_kwargs)
         if test_index is not None:
             eegnet.single_classification(test_index)
             accuracy = -1
@@ -314,9 +314,9 @@ if __name__ == '__main__':
     # Type of preprocessing/features to extract
     # preprocessing_types = ['highgamma', 'allbands', 'broadband40-150', 'articleHFB']
     # preprocessing_types = ['delta', 'theta', 'alpha', 'beta', 'lowgamma', 'highgamma', 'allbands', 'broadband40-150', 'articleHFB']
-    preprocessing_types = ['broadband40-150']
+    preprocessing_types = ['CAR']
     # Define which classifiers to experiment with: 'STMF' / 'SVM' / 'RF' / 'EEGNet'
-    classifiers = ['kNN']
+    classifiers = ['EEGNet_torch']
     # Number of experiments to average accuracy over 
     # (only useful for non-deterministic classifiers)
     n_experiments = 1
@@ -373,3 +373,9 @@ if __name__ == '__main__':
     
     # - In patient '4' trials data: 5 trials have -1 at 3rd column that don't have -1 at 2nd column
     #   while having normal label and normal VOT. Are those bad trials or not? (Not the case for other patients)
+
+    # - Substitute last layer(s) of EEGNet by an LSTM
+    # - Test LSTM alone (without feature extraction layers)
+
+    # Probably better to create 1 script for classifcation with DL models
+    # And for each neural network a separate class just for init and forward
