@@ -32,26 +32,18 @@ class LSTM_Classifier():
                  n_hidden=256, 
                  n_layers=2, 
                  dropout_rate=0.5,
-                 batch_size=1,
+                 batch_size=10,
                  loss_fct=nn.CrossEntropyLoss,
                  optimizer=optim.Adam):
 
         # self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
         self.device = torch.device('cpu')
-        # self.X = torch.from_numpy(X.reshape(X.shape[0], X.shape[2], X.shape[1])).to(self.device)
-        # Need shape [examples, timesteps, features]
-        # X = np.transpose(X, (0,2,1))
-        # self.X = torch.Tensor(X).to(self.device)
-        # print(f'X shape: {self.X.shape}')
-        # self.y = y
+        # Need to convert to float32 (as model weights are float32)
+        X = X.astype(np.float32)
         self.labels = []
         for i, (id, label) in enumerate(labelsdict.items()):
             self.labels.append(label)
             y = np.where(y==id, i, y) # Map labels to 0 - (n_classes-1)
-        print(labelsdict)
-        print(self.labels)
-        # self.y = np.eye(len(np.unique(self.y)))[self.y]
-        # self.y = torch.Tensor(self.y).to(self.device)
         self.id2label = labelsdict
         print(f'X shape: {X.shape}')
         print(f'y shape: {y.shape}')
@@ -79,7 +71,7 @@ class LSTM_Classifier():
         dataloader = DataLoader(TensorDataset(X, y), shuffle=False, batch_size=batch_size)
         return dataloader, X, y
 
-    def train(self, n_epochs=10, verbose=0):
+    def train(self, n_epochs=10, verbose=1):
         self.model.train()
         # Initialize optimizer and loss function
         optimizer = self.optimizer(self.model.parameters())
@@ -89,7 +81,7 @@ class LSTM_Classifier():
             if verbose:
                 print(f'\nEpoch {epoch+1}/{n_epochs}...')
             epoch_loss = 0
-            for batch_X, batch_y in self.dataloader:
+            for batch_X, batch_y in tqdm(self.dataloader):
                 optimizer.zero_grad()
                 output = self.model.forward(batch_X)
                 loss = lossfunction(output, batch_y)
