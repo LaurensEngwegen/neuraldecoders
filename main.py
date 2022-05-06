@@ -7,6 +7,7 @@ from kNN_Classifier import kNN_Classifier
 from RF_Classifier import RF_Classifier
 from EEGNet_tf_Classifier import EEGNet_tf_Classifier
 from EEGNet_torch_Classifier import EEGNet_torch_Classifier
+from LSTM_Classifier import LSTM_Classifier
 
 import os
 import numpy as np
@@ -159,6 +160,14 @@ def classification(classifier,
             accuracy = -1
         if LOO:
             accuracy = eegnet.LOO_classification(make_plots)
+
+    elif classifier == 'LSTM':
+        lstm = LSTM_Classifier(X, y, labelsdict)
+        if test_index is not None:
+            lstm.single_classification(test_index)
+            accuracy = -1
+        if LOO:
+            accuracy = lstm.LOO_classification(make_plots)
     return accuracy
 
 def classification_loop(patient_IDs,
@@ -316,10 +325,10 @@ if __name__ == '__main__':
     # preprocessing_types = ['delta', 'theta', 'alpha', 'beta', 'lowgamma', 'highgamma', 'allbands', 'broadband40-150', 'articleHFB']
     preprocessing_types = ['CAR']
     # Define which classifiers to experiment with: 'STMF' / 'SVM' / 'RF' / 'EEGNet'
-    classifiers = ['EEGNet_torch']
+    classifiers = ['LSTM']
     # Number of experiments to average accuracy over 
     # (only useful for non-deterministic classifiers)
-    n_experiments = 1
+    n_experiments = 10
     
     # Which functionalities to execute (True/False)
     preprocess = False
