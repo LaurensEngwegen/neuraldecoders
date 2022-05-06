@@ -318,8 +318,8 @@ if __name__ == '__main__':
     labels = ['/p/', '/oe/', '/a/', '/k/', 'Rest']
     
     # Patient data to use
-    patient_IDs = ['1','2','3','4','5','6','7','8']
-    # patient_IDs = ['1']
+    # patient_IDs = ['1','2','3','4','5','6','7','8']
+    patient_IDs = ['1']
     # Type of preprocessing/features to extract
     # preprocessing_types = ['highgamma', 'allbands', 'broadband40-150', 'articleHFB']
     # preprocessing_types = ['delta', 'theta', 'alpha', 'beta', 'lowgamma', 'highgamma', 'allbands', 'broadband40-150', 'articleHFB']
@@ -328,7 +328,7 @@ if __name__ == '__main__':
     classifiers = ['LSTM']
     # Number of experiments to average accuracy over 
     # (only useful for non-deterministic classifiers)
-    n_experiments = 10
+    n_experiments = 1
     
     # Which functionalities to execute (True/False)
     preprocess = False
