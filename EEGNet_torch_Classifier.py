@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 import torch.nn.functional as F
+from torch.utils.data import TensorDataset, DataLoader
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -39,31 +40,23 @@ class EEGNet_torch_Classifier(nn.Module):
                  optimizer=optim.Adam, 
                  loss=nn.CrossEntropyLoss):
         super(EEGNet_torch_Classifier, self).__init__()
-    
+        # Search for cuda device
         self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-        print(f'Device: {self.device}')
-        
-        self.X = torch.from_numpy(X).to(self.device)
-        print(self.X)
-
-        # self.y = np.zeros((len(y), 5)) # 5 classes
-        # for i in range(len(y)):
-        #     label = y[i]
-        #     self.y[i,label-1] = 1
-        # self.y = torch.from_numpy(self.y).to(self.device)
-        self.y = y
-
+        # Need to convert to float32 (as model weights are float32)
+        self.X = X.astype(np.float32)
         self.labels = []
+        self.y = y
         for i, (id, label) in enumerate(labelsdict.items()):
             self.labels.append(label)
-            self.y = np.where(y==id, i, self.y)
-        # print(self.y)
-        self.y = np.eye(len(np.unique(self.y)))[self.y]
-        self.y = torch.from_numpy(self.y).to(self.device).float()
-        print(self.y)
+        # Convert labels to labels from 0 to (#classes-1)
+        for i in range(len(y)):
+            index = y[i]
+            label = labelsdict[index]
+            self.y[i] = self.labels.index(label)
+        # Data properties
         self.id2label = labelsdict
         self.n_classes = len(self.labels)
-
+        # Hyperparameters of EEGNet
         self.kernLength = kernLength
         self.n_channels = n_channels
         self.n_samples = n_samples
@@ -73,9 +66,20 @@ class EEGNet_torch_Classifier(nn.Module):
         self.dropout_rate = dropoutRate
         self.norm1 = norm1
         self.norm2 = norm2
-
+        # Optimizer and loss function
         self.optimizer = optimizer
         self.loss = loss
+
+    def create_dataloader(self, X, y):
+        # Need shape [examples, timesteps, features]
+        X = np.transpose(X, (0,2,1))
+        X = torch.from_numpy(X).to(self.device)
+        # Need to one-hot encode y
+        y = np.eye(self.n_classes)[y]
+        y = torch.from_numpy(y).to(self.device)
+        # Create dataloader
+        dataloader = DataLoader(TensorDataset(X, y), shuffle=False, batch_size=self.batch_size)
+        return dataloader, X, y    
 
     def initialize_model(self):
         
@@ -117,57 +121,51 @@ class EEGNet_torch_Classifier(nn.Module):
         # Flatten, linear, softmax
         self.layers.append(nn.Flatten(0))
         self.layers.append(constrainedLinear(int(self.F2*self.n_samples/32), self.n_classes))
-        # self.layers.append(nn.Softmax())
+        self.layers.append(nn.Softmax(dim=1))
 
-        self.model = nn.ModuleList(self.layers).float()
+        model = nn.ModuleList(self.layers).float()
 
-        self.model.to(self.device)
+        model.to(self.device)
+
+        return model
 
     def forward(self, x):
-        for layer in self.model:
+        for layer in self.layers:
             x = layer(x)
             # print(f'Layer: {layer}')
             # print(x.shape)
         return x
 
     # TODO: introduce possibility to train in batches
-    def train(self, X_train, y_train, n_epochs=15, verbose=0):
-        self.model.train()
+    def train(self, dataloader, n_epochs=15, verbose=0):
         # Initialize optimizer and loss function
         optimizer = self.optimizer(self.model.parameters())
         lossfunction = self.loss()
         # Start training for n_epochs
         for epoch in range(n_epochs):
+            self.model.train()
             if verbose:
                 print(f'\nEpoch {epoch+1}/{n_epochs}...')
             epoch_loss = 0
-            for X, y in zip(X_train, y_train):
+            for batch_X, batch_y in dataloader:
                 optimizer.zero_grad()
-                X = X[None, :] # Needed when unbatched
-                y = y[None, :]
-                # y = argmax eerst
-                output = self.forward(X)
-                # print(output)
-                output = output[None, :]
-                print('\n\n\n')
-                print(output)
-                print(y)
-                print(torch.argmax(output))
-                print(torch.argmax(y))
-                loss = lossfunction(torch.argmax(output, dim=1), torch.argmax(y, dim=1))
+                output = self.model.forward(batch_X)
+                loss = lossfunction(output, batch_y)
                 loss.backward()
                 optimizer.step()
                 self.layers[1].max_norm(self.norm1)
                 self.layers[11].max_norm(self.norm2)
-
                 epoch_loss += loss
-            epoch_loss = epoch_loss/X_train.shape[0]
             if verbose:
-                print(f'Avg. loss = {epoch_loss}')
-
-
-    def predict(self, X_test):
-        pass
+                print(f'Loss (averaged over batches): {epoch_loss/len(dataloader)}')
+                # Training accuracy
+                self.model.eval()
+                out = self.model.forward(self.X_train)
+                y_pred = torch.argmax(out, dim=1)
+                y_true = torch.argmax(self.y_train, dim=1)
+                correct = torch.sum(y_pred == y_true)
+                acc = correct/self.y_train.shape[0]
+                print(f'Training accuracy: {acc}')
 
     def single_classification(self, test_index):
         self.initialize_model()
@@ -186,22 +184,24 @@ class EEGNet_torch_Classifier(nn.Module):
         for i in range(len(self.y)):
             print(f'Trial {i+1}/{len(self.y)}...')
             self.model = self.initialize_model()
-            self.initialize_model()
             train_indices = [j for j in range(len(self.y)) if j != i]
-            self.train(self.X[train_indices], self.y[train_indices])
+            train_dataloader, self.X_train, self.y_train = self.create_dataloader(self.X[train_indices], self.y[train_indices])
+            
+            self.train(train_dataloader, n_epochs=50)
+
             self.model.eval()
-            test_X = self.X[i]
-            test_X = test_X[None, :]
-            y_pred = torch.argmax(self.forward(test_X))
-            y_true = torch.argmax(self.y[i])
+            _, X_test, y_test = self.create_dataloader(self.X[i:i+1], self.y[i:i+1])
+            y_pred = torch.argmax(self.model.forward(X_test), dim=1).item()
+            y_true = torch.argmax(y_test, dim=1).item()
             y_preds.append(y_pred)
             y_trues.append(y_true)
-            print(f"{i}. True - predicted ==> {y_true} - {y_pred}")
+            # print(f"True - predicted ==> {y_true} - {y_pred}")
             if y_pred == y_true:
                 correct += 1
-        print(f'Accuracy = {correct/len(self.y)}')
+        accuracy = correct/len(self.y)
+        print(f'LOO Accuracy = {correct/len(self.y)}')
         print(f'correct: {correct}, len(y): {len(self.y)}')
         if plot_cm:
             ConfusionMatrixDisplay.from_predictions(y_trues.cpu(), y_preds.cpu(), display_labels=self.labels)
             plt.show()
-        return correct/len(self.y)
+        return accuracy

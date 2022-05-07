@@ -161,6 +161,7 @@ def classification(classifier,
         if LOO:
             accuracy = eegnet.LOO_classification(make_plots)
 
+    # Classification wit (stacked) LSTM
     elif classifier == 'LSTM':
         lstm = LSTM_Classifier(X, y, labelsdict)
         if test_index is not None:
@@ -317,8 +318,8 @@ if __name__ == '__main__':
     labels = ['/p/', '/oe/', '/a/', '/k/', 'Rest']
     
     # Patient data to use
-    # patient_IDs = ['1','2','3','4','5','6','7','8']
-    patient_IDs = ['7', '8']
+    patient_IDs = ['1','2','3','4','5','6','7','8']
+    # patient_IDs = ['7', '8']
     # Type of preprocessing/features to extract
     # preprocessing_types = ['highgamma', 'allbands', 'broadband40-150', 'articleHFB']
     # preprocessing_types = ['delta', 'theta', 'alpha', 'beta', 'lowgamma', 'highgamma', 'allbands', 'broadband40-150', 'articleHFB']
