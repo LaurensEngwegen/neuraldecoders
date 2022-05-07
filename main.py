@@ -264,7 +264,6 @@ def plot_features_results(classifiers, preprocessing_types, patient_IDs):
         plt.grid(alpha=0.35)
         plt.show()
 
-
 def plot_classifier_results(patient_IDs):
     result_info = {
         'STMF': 'highgamma',
@@ -319,7 +318,7 @@ if __name__ == '__main__':
     
     # Patient data to use
     # patient_IDs = ['1','2','3','4','5','6','7','8']
-    patient_IDs = ['1']
+    patient_IDs = ['7', '8']
     # Type of preprocessing/features to extract
     # preprocessing_types = ['highgamma', 'allbands', 'broadband40-150', 'articleHFB']
     # preprocessing_types = ['delta', 'theta', 'alpha', 'beta', 'lowgamma', 'highgamma', 'allbands', 'broadband40-150', 'articleHFB']
@@ -335,7 +334,7 @@ if __name__ == '__main__':
     create_trials = False
     classify = True
     make_plots = False
-    save_results = False
+    save_results = True
     
     if preprocess:
         for pID in patient_IDs:
