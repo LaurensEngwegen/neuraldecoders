@@ -19,20 +19,20 @@ class LSTMModel(nn.Module):
                             dropout=dropout_rate)
 
         self.linear = nn.Linear(n_hidden, n_classes)
-        self.softmax = nn.Softmax(dim=1)
+        # self.softmax = nn.Softmax(dim=1)
 
     def forward(self, x):
         _, (hidden_state, _) = self.lstm(x)
         output = self.linear(hidden_state[-1]) # Last layer, last state
-        output = self.softmax(output)
+        # output = self.softmax(output)
         return output
 
 class LSTM_Classifier():
     def __init__(self, X, y, labelsdict, 
-                 n_hidden=128, 
+                 n_hidden=16, 
                  n_layers=2, 
-                 dropout_rate=0.5,
-                 batch_size=5,
+                 dropout_rate=0.2,
+                 batch_size=10,
                  loss_fct=nn.CrossEntropyLoss,
                  optimizer=optim.Adam):
         # Search for cuda device
@@ -40,7 +40,7 @@ class LSTM_Classifier():
         # Need to convert to float32 (as model weights are float32)
         self.X = X.astype(np.float32)
         self.labels = []
-        self.y = y
+        self.y = y.astype(np.long)
         for i, (id, label) in enumerate(labelsdict.items()):
             self.labels.append(label)
         # Convert labels to labels from 0 to (#classes-1)
@@ -65,13 +65,13 @@ class LSTM_Classifier():
         X = np.transpose(X, (0,2,1))
         X = torch.from_numpy(X).to(self.device)
         # Need to one-hot encode y
-        y = np.eye(self.n_classes)[y]
+        # y = np.eye(self.n_classes)[y]
         y = torch.from_numpy(y).to(self.device)
         # Create dataloader
         dataloader = DataLoader(TensorDataset(X, y), shuffle=False, batch_size=self.batch_size)
         return dataloader, X, y
 
-    def train(self, dataloader, n_epochs=10, verbose=0):
+    def train(self, dataloader, n_epochs=10, verbose=1):
         # Initialize optimizer and loss function
         optimizer = self.optimizer(self.model.parameters())
         lossfunction = self.loss_fct()
@@ -84,6 +84,8 @@ class LSTM_Classifier():
             for batch_X, batch_y in dataloader:
                 optimizer.zero_grad()
                 output = self.model.forward(batch_X)
+                print(output)
+                print(batch_y)
                 loss = lossfunction(output, batch_y)
                 loss.backward()
                 optimizer.step()
@@ -94,7 +96,7 @@ class LSTM_Classifier():
                 self.model.eval()
                 out = self.model.forward(self.X_train)
                 y_pred = torch.argmax(out, dim=1)
-                y_true = torch.argmax(self.y_train, dim=1)
+                y_true = self.y_train
                 correct = torch.sum(y_pred == y_true)
                 acc = correct/self.y_train.shape[0]
                 print(f'Training accuracy: {acc}')
@@ -102,27 +104,33 @@ class LSTM_Classifier():
 
     # TODO
     def single_classification(self, test_index):
-        self.model = LSTMModel(self.n_features, self.n_classes, self.n_hidden, self.n_layers, self.dropout_rate)
+        self.model = LSTMModel(self.n_features, self.n_classes, self.n_hidden, self.n_layers, self.dropout_rate).to(self.device)
         train_indices = [j for j in range(len(self.y)) if j != test_index]
-        self.train(self.X[train_indices], self.y[train_indices])
+        train_dataloader, self.X_train, self.y_train = self.create_dataloader(self.X[train_indices], self.y[train_indices])
+        
+        self.train(train_dataloader, n_epochs=30)
+
         self.model.eval()
-        test_X = self.X[test_index]
-        test_X = test_X[None, :]
-        y_pred = torch.argmax(self.forward(test_X))
-        y_true = torch.argmax(self.y[test_index])
-        print(f'Predicted: {y_pred}, true: {y_true}')
+        _, X_test, y_test = self.create_dataloader(self.X[test_index:test_index+1], self.y[test_index:test_index+1])
+        # y_pred = torch.argmax(self.model.forward(X_test), dim=1).item()
+        # y_true = torch.argmax(y_test, dim=1).item()
+        y_pred = torch.argmax(self.model.forward(X_test), dim=1).item()
+        y_true = y_test.item()
+        print(f"True - predicted ==> {y_true} - {y_pred}")
 
     def LOO_classification(self, plot_cm=True):
         y_preds, y_trues = [], []
         correct = 0
-
+        for i in range(15):
+            self.single_classification(i)
+        '''
         for i in tqdm(range(len(self.y))):
             # print(f'\nTrial {i+1}/{len(self.y)}...')
             self.model = LSTMModel(self.n_features, self.n_classes, self.n_hidden, self.n_layers, self.dropout_rate).to(self.device)
             train_indices = [j for j in range(len(self.y)) if j != i]
             train_dataloader, self.X_train, self.y_train = self.create_dataloader(self.X[train_indices], self.y[train_indices])
             
-            self.train(train_dataloader, n_epochs=50)
+            self.train(train_dataloader, n_epochs=10)
 
             self.model.eval()
             _, X_test, y_test = self.create_dataloader(self.X[i:i+1], self.y[i:i+1])
@@ -140,4 +148,4 @@ class LSTM_Classifier():
             ConfusionMatrixDisplay.from_predictions(y_trues.cpu(), y_preds.cpu(), display_labels=self.labels)
             plt.show()
         return accuracy
-        
+        '''

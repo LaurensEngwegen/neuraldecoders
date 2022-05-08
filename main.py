@@ -318,14 +318,14 @@ if __name__ == '__main__':
     labels = ['/p/', '/oe/', '/a/', '/k/', 'Rest']
     
     # Patient data to use
-    patient_IDs = ['1','2','3','4','5','6','7','8']
-    # patient_IDs = ['7', '8']
+    # patient_IDs = ['1','2','3','4','5','6','7','8']
+    patient_IDs = ['1']
     # Type of preprocessing/features to extract
     # preprocessing_types = ['highgamma', 'allbands', 'broadband40-150', 'articleHFB']
     # preprocessing_types = ['delta', 'theta', 'alpha', 'beta', 'lowgamma', 'highgamma', 'allbands', 'broadband40-150', 'articleHFB']
     preprocessing_types = ['CAR']
     # Define which classifiers to experiment with: 'STMF' / 'SVM' / 'RF' / 'EEGNet'
-    classifiers = ['LSTM']
+    classifiers = ['EEGNet_torch']
     # Number of experiments to average accuracy over 
     # (only useful for non-deterministic classifiers)
     n_experiments = 1
@@ -335,7 +335,7 @@ if __name__ == '__main__':
     create_trials = False
     classify = True
     make_plots = False
-    save_results = True
+    save_results = False
     
     if preprocess:
         for pID in patient_IDs:
