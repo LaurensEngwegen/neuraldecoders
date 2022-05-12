@@ -13,12 +13,16 @@ class Trials_Creator():
                  sampling_rate,
                  save_path=None, 
                  time_window_start=-0.5, 
-                 time_window_stop=0.5):
+                 time_window_stop=0.5,
+                 restvsactive=False):
         # Hyperparameters for trial construction
         self.sampling_rate = sampling_rate
         self.time_window_start = time_window_start # seconds
         self.time_window_stop = time_window_stop # seconds
         self.offset = patient_data.VOT_offset # samples
+
+        # Whether binary (rest vs. active) or multi-class classification
+        self.restvsactive = restvsactive
 
         # Last one should always be rest
         self.label_indices = patient_data.label_indices
@@ -109,14 +113,22 @@ class Trials_Creator():
                     data.append(processed_data[:, :, trial[1]+startpoint:trial[1]+endpoint])
                 else:
                     data.append(processed_data[:, trial[1]+startpoint:trial[1]+endpoint])
-                labels.append(trial[3])
+                # Store 1 if rest vs. active classifcation, else store phoneme index
+                if self.restvsactive:
+                    labels.append(1)
+                else:
+                    labels.append(trial[3])
             # Create trial from QOT if rest trial
             elif trial[3] == self.label_indices[-1]:
                 if len(processed_data.shape) == 3:
                     data.append(processed_data[:, :, trial[0]:trial[0]+totalpoints])
                 else:
                     data.append(processed_data[:, trial[0]:trial[0]+totalpoints])
-                labels.append(trial[3])
+                # Store 0 if rest vs. active classifcation, else store phoneme index
+                if self.restvsactive:
+                    labels.append(0)
+                else:
+                    labels.append(trial[3])
         data = np.array(data)
         labels = np.array(labels)
         print(f'Shape trials data: {data.shape}')
@@ -125,7 +137,7 @@ class Trials_Creator():
     def print_nr_trials(self):
         print('\nNumber of trials')
         for label in np.unique(self.y):
-            print(f'Label {label}: {np.count_nonzero(self.y[self.y==label])}')
+            print(f'Label {label}: {np.count_nonzero(self.y==label)}')
         print(f'Total: {self.y.shape[0]}')
         
     def save_trials(self, save_path):

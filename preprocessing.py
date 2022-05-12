@@ -154,7 +154,8 @@ class Preprocessor():
             car_data = data - np.mean(data[CAR_channels], 0)
         return car_data
 
-   # TODO: add more comments
+    # TODO: find better way to include RvA
+    # TODO: add more comments
     def wavelet_transform(self, data, plot_result=False, nr_channels=-1):
         if nr_channels == -1:
             nr_channels = data.shape[0]
@@ -170,6 +171,8 @@ class Preprocessor():
         }
         if self.preprocessing_type == 'allbands':
             freqs = [freq_bands['delta'], freq_bands['theta'], freq_bands['alpha'], freq_bands['beta'], freq_bands['lowgamma'], freq_bands['highgamma']]
+        elif self.preprocessing_type == 'allbands2':
+            freqs = [freq_bands['delta'], freq_bands['theta'], freq_bands['alpha'], freq_bands['beta'], np.arange(40,151)]
         elif self.preprocessing_type == 'broadband40-150':
             freqs = [np.arange(40,151)]
         elif self.preprocessing_type == 'articleHFB':
