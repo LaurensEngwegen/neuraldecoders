@@ -1,11 +1,9 @@
-from unittest import result
 from patient_data_mapping import PatientDataMapper
 from preprocessing import Preprocessor
 from trials_creation import Trials_Creator
 from STMF_Classifier import STMF_Classifier
 from SVM_Classifier import SVM_Classifier
 from kNN_Classifier import kNN_Classifier
-from RF_Classifier import RF_Classifier
 from FFN_Classifier import FFN_Classifier
 from EEGNet_tf_Classifier import EEGNet_tf_Classifier
 from EEGNet_torch_Classifier import EEGNet_torch_Classifier
@@ -14,6 +12,7 @@ from LSTM_Classifier_tf import LSTM_Classifier_tf
 
 import os
 import numpy as np
+from sklearn.metrics import accuracy_score
 import pickle as pkl
 import matplotlib.pyplot as plt
 
@@ -89,18 +88,18 @@ def classification(classifier,
         stmf_cls = STMF_Classifier(X, y, labelsdict, trial_window_start, trial_window_stop)
         if test_index is not None:
             stmf_cls.single_classification(test_index)
-            accuracy = -1
+            accuracy, y_true, y_pred = -1, -1, -1
         if LOO:
-            accuracy = stmf_cls.LOO_classification(plot_cm=make_plots, plot_HFB=make_plots)
+            accuracy, y_true, y_pred = stmf_cls.LOO_classification(plot_cm=make_plots, plot_HFB=make_plots)
 
     # Classification with a support vector machine
     elif classifier == 'SVM':
         svm = SVM_Classifier(X, y, labelsdict)
         if test_index is not None:
             svm.single_classification(test_index)
-            accuracy = -1
+            accuracy, y_true, y_pred = -1, -1, -1
         if LOO:
-            accuracy = svm.LOO_classification(make_plots)
+            accuracy, y_true, y_pred = svm.LOO_classification(make_plots)
 
     # Classification on basis of k nearest neighbours
     elif classifier in ['kNN3','kNN5','kNN7','kNN9','kNN11','kNN13','kNN15','kNN17','kNN19']:
@@ -130,9 +129,9 @@ def classification(classifier,
         ffn = FFN_Classifier(X, y, labelsdict, n_nodes)
         if test_index is not None:
             ffn.single_classification(test_index)
-            accuracy = -1
+            accuracy, y_true, y_pred = -1, -1, -1
         if LOO:
-            accuracy = ffn.LOO_classification(make_plots)
+            accuracy, y_true, y_pred = ffn.LOO_classification(make_plots)
 
     # Classification with EEGNet in TensorFlow
     elif classifier in ['EEGNet', 'EEGNet4-2', 'EEGNet16-2']:
@@ -161,9 +160,9 @@ def classification(classifier,
         # print(eegnet_tf.initialize_model().summary())
         if test_index is not None:
             eegnet_tf.single_classification(test_index)
-            accuracy = -1
+            accuracy, y_true, y_pred = -1, -1, -1
         if LOO:
-            accuracy = eegnet_tf.LOO_classification(make_plots)
+            accuracy, y_true, y_pred = eegnet_tf.LOO_classification(make_plots)
 
     # Classification with EEGNet in PyTorch
     elif classifier == 'EEGNet_torch':
@@ -181,28 +180,28 @@ def classification(classifier,
         eegnet = EEGNet_torch_Classifier(X, y, labelsdict, n_channels=X.shape[1], **eegnet_kwargs)
         if test_index is not None:
             eegnet.single_classification(test_index)
-            accuracy = -1
+            accuracy, y_true, y_pred = -1, -1, -1
         if LOO:
-            accuracy = eegnet.LOO_classification(make_plots)
+            accuracy, y_true, y_pred = eegnet.LOO_classification(make_plots)
 
     # Classification wit (stacked) LSTM
     elif classifier == ['LSTM256', 'LSTM128', 'LSTM64', 'LSTM32']:
         lstm = LSTM_Classifier(X, y, labelsdict)
         if test_index is not None:
             lstm.single_classification(test_index)
-            accuracy = -1
+            accuracy, y_true, y_pred = -1, -1, -1
         if LOO:
-            accuracy = lstm.LOO_classification(make_plots)
+            accuracy, y_true, y_pred = lstm.LOO_classification(make_plots)
     
     elif classifier == 'LSTM_tf':
         lstm = LSTM_Classifier_tf(X, y, labelsdict)
         if test_index is not None:
             lstm.single_classification(test_index)
-            accuracy = -1
+            accuracy, y_true, y_pred = -1, -1, -1
         if LOO:
-            accuracy = lstm.LOO_classification(make_plots)
+            accuracy, y_true, y_pred = lstm.LOO_classification(make_plots)
     
-    return accuracy
+    return accuracy, y_true, y_pred
 
 def classification_loop(patient_IDs,
                         preprocessing_types,
@@ -219,12 +218,12 @@ def classification_loop(patient_IDs,
                         test_index=None):
     # Create dict to store accuracies 
     # (in lists for possibility to average over multiple experiments)
-    accuracies = dict()
+    results = dict()
     # Start classification loop
     for classifier in classifiers:
-        accuracies[classifier] = dict()
+        results[classifier] = dict()
         for preprocessing_type in preprocessing_types:
-            accuracies[classifier][preprocessing_type] = dict()
+            results[classifier][preprocessing_type] = dict()
             for pID in patient_IDs:
                 patient_data = PatientDataMapper(pID)
                 # Path where trials are stored
@@ -233,40 +232,63 @@ def classification_loop(patient_IDs,
                 labelsdict = {patient_data.label_indices[i]: labels[i] for i in range(len(labels))}
                 # Load (preprocessed) trials for specific patient
                 X, y = load_trials(trials_path)
-                accuracies[classifier][preprocessing_type][patient_data.patient] = []
+                results[classifier][preprocessing_type][patient_data.patient] = {'y_true': [], 'y_pred': []}
                 for i in range(n_experiments):
                     print(f'\nRepetition {i+1} using \'{preprocessing_type}\' trials from patient \'{pID}\' ({X.shape[1]} channels, {X.shape[0]} trials)')
                     print(f'Classification with {classifier}...')
-                    accuracy = classification(classifier,
-                                              X, 
-                                              y, 
-                                              labelsdict, 
-                                              sampling_rate,
-                                              trial_window_start,
-                                              trial_window_stop, 
-                                              make_plots=make_plots, 
-                                              LOO=LOO,
-                                              test_index=test_index)
-                    accuracies[classifier][preprocessing_type][patient_data.patient].append(accuracy)
+                    accuracy, y_true, y_pred = classification(classifier,
+                                                              X, 
+                                                              y, 
+                                                              labelsdict, 
+                                                              sampling_rate,
+                                                              trial_window_start,
+                                                              trial_window_stop, 
+                                                              make_plots=make_plots, 
+                                                              LOO=LOO,
+                                                              test_index=test_index)
+                    results[classifier][preprocessing_type][patient_data.patient]['y_true'].append(y_true)
+                    results[classifier][preprocessing_type][patient_data.patient]['y_pred'].append(y_pred)
                 if save_results:
                     directory = f'results/{classifier}/{preprocessing_type}{classification_type}'
                     if not os.path.exists(directory):
                         os.makedirs(directory)
                     file = f'{directory}/{patient_data.patient}{classification_type}_results.pkl'
                     with open(file, 'wb+') as f:
-                        pkl.dump(accuracies[classifier][preprocessing_type][patient_data.patient], f)
+                        pkl.dump(results[classifier][preprocessing_type][patient_data.patient], f)
                     print(f'Results stored in \'{file}\'')
-    return accuracies
+    return results
 
-def print_results(accuracies, n_experiments):
+def print_results(results, n_experiments):
     # Accuracies is dictionary with [classifier][patient][preprocessing_type]
     print(f'\n\nAverage accuracies (over {n_experiments} runs)')
-    for classifier, processing_dict in accuracies.items():
+    for classifier, processing_dict in results.items():
         print(f'\n{classifier}')
         for processing, patient_dict in processing_dict.items():
-            for patient, all_accs in patient_dict.items():
+            for patient, y_dict in patient_dict.items():
+                all_accs = []
+                for i in range(n_experiments):
+                    all_accs.append(accuracy_score(y_dict['y_true'][i], y_dict['y_pred'][i]))
                 all_accs = np.array(all_accs)
                 print(f'{patient}-{processing}:\t{np.mean(all_accs)} ({np.std(all_accs)})')
+
+def get_accuracy(file):
+    with open(file, 'rb') as f:
+        results = pkl.load(f)
+    # Previously stored results as list of accuracies instead of y's
+    if isinstance(results, list):
+        results = np.array(results)
+        return np.mean(results), np.std(results)
+    else:
+        accs = []
+        print(results)
+        n_experiments = len(results['y_true'])
+        print(f'epxs = {n_experiments}')
+        for i in range(n_experiments):
+            accs.append(accuracy_score(results['y_true'][i], results['y_pred'][i]))
+        accs = np.array(accs)
+        return np.mean(accs), np.std(accs)
+
+
 
 def plot_features_results(classifiers, preprocessing_types, patient_IDs, restvsactive=False):
     if restvsactive:
@@ -287,9 +309,8 @@ def plot_features_results(classifiers, preprocessing_types, patient_IDs, restvsa
             for patient_ID in patient_IDs:
                 patient_data = PatientDataMapper(patient_ID)
                 file = f'{directory}/{patient_data.patient}_results.pkl'
-                with open(file, 'rb') as f:
-                    results = np.mean(pkl.load(f))
-                data.append(results)
+                acc, _ = get_accuracy(file)
+                data.append(acc)
             all_data.append(data) # Patients x Preprocessing_types
         # Barplot
         plt.figure(figsize=(12,8))
@@ -350,9 +371,8 @@ def plot_clf_optimization(classifiers, preprocessing_type, patient_IDs, restvsac
             for patient_ID in patient_IDs:
                 patient_data = PatientDataMapper(patient_ID)
                 file = f'{directory}/{patient_data.patient}_results.pkl'
-                with open(file, 'rb') as f:
-                    results = np.mean(pkl.load(f))
-                data.append(results)
+                acc, _ = get_accuracy(file)
+                data.append(acc)
             all_data.append(data) # Patients x Preprocessing_types
         # Barplot
         plt.figure(figsize=(12,8))
@@ -393,10 +413,7 @@ def plot_classifier_results(patient_IDs):
         directory = f'results/{classifier}/{preprocessing_type}'
         for patient in patient_labels:
             file = f'{directory}/{patient}_results.pkl'
-            with open(file, 'rb') as f:
-                results = pkl.load(f)
-            acc = np.mean(results)
-            std = np.std(results)
+            acc, std = get_accuracy(file)
             accs.append(acc)
             stds.append(std)
         all_accs.append(accs)

@@ -65,7 +65,7 @@ class STMF_Classifier():
         if plot_cm:
             ConfusionMatrixDisplay.from_predictions(y_trues, y_preds, display_labels=self.labels)
             plt.show()
-        return accuracy
+        return accuracy, y_trues, y_preds
 
     def single_classification(self, test_index):
         train_indices = [j for j in range(len(self.y)) if j != test_index]

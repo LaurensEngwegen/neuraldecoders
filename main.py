@@ -11,13 +11,13 @@ if __name__ == '__main__':
     trial_window_stop = 0.5
     # Patient data to use
     # patient_IDs = ['1','2','3','4','5','6','7','8']
-    patient_IDs = ['1','2','3','5','6','7','8']
-    # patient_IDs = ['5']
+    # patient_IDs = ['1','2','3','5','6','7','8']
+    patient_IDs = ['5']
     # Type of preprocessing/features to extract
     # preprocessing_types = ['delta', 'theta', 'alpha', 'beta', 'gamma', 'allbands']
-    preprocessing_types = ['gamma', 'allbands']
+    preprocessing_types = ['gamma']
     # Define which classifiers to experiment with: 'STMF' / 'SVM' / 'kNN' / ('RF') / 'EEGNet' / 'LSTM'
-    classifiers = ['STMF']
+    classifiers = ['kNN11']
     # Number of experiments to average accuracy over 
     # (only useful for non-deterministic classifiers)
     n_experiments = 1
@@ -31,7 +31,7 @@ if __name__ == '__main__':
     plot_results = True
 
     # Either binary (rest vs. active) or multi-class classification
-    restvsactive = True
+    restvsactive = False
     if restvsactive:
         labels = ['Rest', 'Active']
         classification_type = '_RvA'
@@ -61,7 +61,7 @@ if __name__ == '__main__':
                                     restvsactive)
     
     if classify:
-        accuracies = classification_loop(patient_IDs, 
+        results = classification_loop(patient_IDs, 
                                          preprocessing_types,
                                          classifiers,
                                          classification_type,
@@ -73,12 +73,12 @@ if __name__ == '__main__':
                                          make_plots,
                                          save_results,
                                          LOO=True)
-        print_results(accuracies, n_experiments)
+        print_results(results, n_experiments)
 
     if plot_results:
         # plot_features_results(classifiers, preprocessing_types, patient_IDs, restvsactive)
-        # plot_clf_optimization(['FFN'], 'gamma', patient_IDs)
-        plot_classifier_results(patient_IDs)
+        plot_clf_optimization(['FFN'], 'gamma', patient_IDs)
+        # plot_classifier_results(patient_IDs)
 
     # TODO:
     # - Run FFN also for CAR data (to compare with EEGNet & LSTM)

@@ -220,4 +220,4 @@ class EEGNet_torch_Classifier():
         if plot_cm:
             ConfusionMatrixDisplay.from_predictions(y_trues.cpu(), y_preds.cpu(), display_labels=self.labels)
             plt.show()
-        return accuracy
+        return accuracy, y_trues, y_preds
