@@ -23,12 +23,12 @@ if __name__ == '__main__':
     n_experiments = 1
     
     # Which functionalities to execute (True/False)
-    preprocess = True
-    create_trials = True
-    classify = True
+    preprocess = False
+    create_trials = False
+    classify = False
     make_plots = False
     save_results = False
-    plot_results = False
+    plot_results = True
 
     # Either binary (rest vs. active) or multi-class classification
     restvsactive = True
@@ -76,9 +76,9 @@ if __name__ == '__main__':
         print_results(accuracies, n_experiments)
 
     if plot_results:
-        plot_features_results(classifiers, preprocessing_types, patient_IDs, restvsactive)
-        # plot_clf_optimization(['kNN'], 'gamma', patient_IDs)
-        # plot_classifier_results(patient_IDs)
+        # plot_features_results(classifiers, preprocessing_types, patient_IDs, restvsactive)
+        # plot_clf_optimization(['FFN'], 'gamma', patient_IDs)
+        plot_classifier_results(patient_IDs)
 
     # TODO:
     # - Run FFN also for CAR data (to compare with EEGNet & LSTM)

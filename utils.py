@@ -111,18 +111,9 @@ def classification(classifier,
         kNN = kNN_Classifier(X, y, labelsdict, n_neighbors)
         if test_index is not None:
             kNN.single_classification(test_index)
-            accuracy = -1
+            accuracy, y_true, y_pred = -1, -1, -1
         if LOO:
-            accuracy = kNN.LOO_classification(make_plots)
-
-    # Classification with a random forest
-    elif classifier == 'RF':
-        rf = RF_Classifier(X, y, labelsdict)
-        if test_index is not None:
-            rf.single_classification(test_index)
-            accuracy = -1
-        if LOO:
-            accuracy = rf.LOO_classification(make_plots)
+            accuracy, y_true, y_pred = kNN.LOO_classification(make_plots)
 
     # Classification with (simple) feedforward neural network
     elif classifier in ['FFN256-128','FFN128-64','FFN64-32','FFN32-16','FFN16-8']:
@@ -195,7 +186,7 @@ def classification(classifier,
             accuracy = eegnet.LOO_classification(make_plots)
 
     # Classification wit (stacked) LSTM
-    elif classifier == 'LSTM':
+    elif classifier == ['LSTM256', 'LSTM128', 'LSTM64', 'LSTM32']:
         lstm = LSTM_Classifier(X, y, labelsdict)
         if test_index is not None:
             lstm.single_classification(test_index)
@@ -320,9 +311,11 @@ def plot_clf_optimization(classifiers, preprocessing_type, patient_IDs, restvsac
         # k's tested for kNN
         if classifier == 'kNN':
             params = ['3','5','7','9','11','13','15','17','19']
+            labelprefix = '$k$ = '
         # Architectures tested for FFN
         elif classifier == 'FFN':
             params = ['256-128','128-64','64-32','32-16','16-8']
+            labelprefix = 'FFN'
         n_params = len(params)
         tested_classifiers = []
         for param in params:
@@ -335,18 +328,18 @@ def plot_clf_optimization(classifiers, preprocessing_type, patient_IDs, restvsac
         for patient_ID in patient_IDs:
             patient_labels.append(PatientDataMapper(patient_ID).patient)
         x_axis = np.arange(len(patient_IDs))
-        width = 0.1
+        width = 0.08
         pos = []
         # Make 'pos' a list of len=n_params with values around 0
         if n_params % 2 == 0: # even number of params
-            for i in np.arange(-0.05-((n_params-2)/2)*0.1, 0, 0.1):
+            for i in np.arange(-0.5*width-((n_params-2)/2)*width, 0, width):
                 pos.append(round(i,2))
-            for i in np.arange(0.05, 0.05+((n_params-2)/2)*0.1, 0.1):
+            for i in np.arange(0.5*width, 0.5*width+((n_params-2)/2)*width, width):
                 pos.append(round(i,2))
         else: # odd number of params
-            for i in np.arange(0-((n_params-1)/2)*0.1, 0, 0.1):
+            for i in np.arange(0-((n_params-1)/2)*width, 0, width):
                 pos.append(round(i,2))
-            for i in np.arange(0, ((n_params+1)/2)*0.1, 0.1):
+            for i in np.arange(0, ((n_params+1)/2)*width, width):
                 pos.append(round(i,2))
 
         # Read all result data
@@ -364,7 +357,7 @@ def plot_clf_optimization(classifiers, preprocessing_type, patient_IDs, restvsac
         # Barplot
         plt.figure(figsize=(12,8))
         for i, data in enumerate(all_data):
-            plt.bar(x_axis + pos[i], data, width=width, label=f'$k$ = {params[i]}')
+            plt.bar(x_axis + pos[i], data, width=width, label=f'{labelprefix}{params[i]}')
         if restvsactive:
             title = f'Accuracy of {classifier} on active vs. rest'
         else:
@@ -382,7 +375,7 @@ def plot_classifier_results(patient_IDs):
         'STMF': {'ptype': 'gamma', 'title': 'STMF'},
         'SVM': {'ptype': 'gamma', 'title': 'SVM'},
         'kNN11': {'ptype': 'gamma', 'title': 'kNN (k=11)'},
-        'FFN256-128': {'ptype': 'gamma', 'title': 'FFN gamma'},
+        'FFN128-64': {'ptype': 'gamma', 'title': 'FFN (features)'},
         'EEGNet': {'ptype': 'CAR', 'title': 'EEGNet'}
     }
 
