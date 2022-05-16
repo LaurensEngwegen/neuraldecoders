@@ -11,13 +11,13 @@ if __name__ == '__main__':
     trial_window_stop = 0.5
     # Patient data to use
     # patient_IDs = ['1','2','3','4','5','6','7','8']
-    # patient_IDs = ['1','2','3','5','6','7','8']
-    patient_IDs = ['5']
+    patient_IDs = ['1','2','3','5','6','7','8']
+    # patient_IDs = ['5']
     # Type of preprocessing/features to extract
-    # preprocessing_types = ['delta', 'theta', 'alpha', 'beta', 'gamma', 'allbands']
-    preprocessing_types = ['gamma']
+    preprocessing_types = ['delta', 'theta', 'alpha', 'beta', 'gamma', 'allbands']
+    # preprocessing_types = ['gamma', 'allbands']
     # Define which classifiers to experiment with: 'STMF' / 'SVM' / 'kNN' / ('RF') / 'EEGNet' / 'LSTM'
-    classifiers = ['kNN11']
+    classifiers = ['SVM']
     # Number of experiments to average accuracy over 
     # (only useful for non-deterministic classifiers)
     n_experiments = 1
@@ -77,7 +77,7 @@ if __name__ == '__main__':
 
     if plot_results:
         # plot_features_results(classifiers, preprocessing_types, patient_IDs, restvsactive)
-        plot_clf_optimization(['FFN'], 'gamma', patient_IDs)
+        plot_clf_optimization(['kNN'], 'gamma', patient_IDs)
         # plot_classifier_results(patient_IDs)
 
     # TODO:

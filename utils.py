@@ -252,7 +252,7 @@ def classification_loop(patient_IDs,
                     directory = f'results/{classifier}/{preprocessing_type}{classification_type}'
                     if not os.path.exists(directory):
                         os.makedirs(directory)
-                    file = f'{directory}/{patient_data.patient}{classification_type}_results.pkl'
+                    file = f'{directory}/{patient_data.patient}_results.pkl'
                     with open(file, 'wb+') as f:
                         pkl.dump(results[classifier][preprocessing_type][patient_data.patient], f)
                     print(f'Results stored in \'{file}\'')
@@ -280,9 +280,7 @@ def get_accuracy(file):
         return np.mean(results), np.std(results)
     else:
         accs = []
-        print(results)
         n_experiments = len(results['y_true'])
-        print(f'epxs = {n_experiments}')
         for i in range(n_experiments):
             accs.append(accuracy_score(results['y_true'][i], results['y_pred'][i]))
         accs = np.array(accs)
@@ -315,7 +313,10 @@ def plot_features_results(classifiers, preprocessing_types, patient_IDs, restvsa
         # Barplot
         plt.figure(figsize=(12,8))
         for i, data in enumerate(all_data):
-            plt.bar(x_axis + pos[i], data, width=width, label=preprocessing_types[i])
+            if restvsactive:
+                plt.bar(x_axis + pos[i], data, width=width, label=preprocessing_types[i][:-4])
+            else:
+                plt.bar(x_axis + pos[i], data, width=width, label=preprocessing_types[i])
         if restvsactive:
             title = f'Accuracy of {classifier} on active vs. rest using different frequency bands'
         else:
@@ -325,6 +326,7 @@ def plot_features_results(classifiers, preprocessing_types, patient_IDs, restvsa
         plt.yticks(np.arange(0,1.01,0.1))
         plt.legend(loc = 6, bbox_to_anchor = (1, 0.5))
         plt.grid(alpha=0.35)
+        plt.tight_layout()
         plt.show()
 
 def plot_clf_optimization(classifiers, preprocessing_type, patient_IDs, restvsactive=False):
@@ -387,9 +389,9 @@ def plot_clf_optimization(classifiers, preprocessing_type, patient_IDs, restvsac
         plt.yticks(np.arange(0,1.01,0.1))
         plt.legend(loc = 6, bbox_to_anchor = (1, 0.5))
         plt.grid(alpha=0.35)
+        plt.tight_layout()
         plt.show()
     
-
 def plot_classifier_results(patient_IDs):
     result_info = {
         'STMF': {'ptype': 'gamma', 'title': 'STMF'},
@@ -428,5 +430,6 @@ def plot_classifier_results(patient_IDs):
     plt.yticks(np.arange(0,1.01,0.1))
     plt.legend()
     plt.grid(alpha=0.35)
+    plt.tight_layout()
     plt.show()
 
