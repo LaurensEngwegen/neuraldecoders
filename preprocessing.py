@@ -166,15 +166,12 @@ class Preprocessor():
             'theta': np.arange(4,9),
             'alpha': np.arange(8,13),
             'beta': np.arange(13,31),
-            'lowgamma': np.arange(30,71),
-            'highgamma': np.arange(70,151)
+            # 'lowgamma': np.arange(30,71),
+            # 'highgamma': np.arange(70,151),
+            'gamma': np.arange(40,151) # Previously called 'broadband40-150'
         }
         if self.preprocessing_type == 'allbands':
-            freqs = [freq_bands['delta'], freq_bands['theta'], freq_bands['alpha'], freq_bands['beta'], freq_bands['lowgamma'], freq_bands['highgamma']]
-        elif self.preprocessing_type == 'allbands2':
-            freqs = [freq_bands['delta'], freq_bands['theta'], freq_bands['alpha'], freq_bands['beta'], np.arange(40,151)]
-        elif self.preprocessing_type == 'broadband40-150':
-            freqs = [np.arange(40,151)]
+            freqs = [freq_bands['delta'], freq_bands['theta'], freq_bands['alpha'], freq_bands['beta'], freq_bands['gamma']]
         elif self.preprocessing_type == 'articleHFB':
             freqs = [np.arange(65,126)]
         else:

@@ -9,23 +9,14 @@ if __name__ == '__main__':
     trial_window_start = -0.5
     # Wherer does trial window stop relative to VOT (seconds)
     trial_window_stop = 0.5
-    # Either binary (rest vs. active) or multi-class classification
-    restvsactive = True
-    if restvsactive:
-        labels = ['Rest', 'Active']
-        classification_type = '_RvA'
-    else:
-        # Spoken phonemes
-        labels = ['/p/', '/oe/', '/a/', '/k/', 'Rest']
-        classification_type = ''
     # Patient data to use
-    patient_IDs = ['1','2','3','4','5','6','7','8']
-    # patient_IDs = ['1']
+    # patient_IDs = ['1','2','3','4','5','6','7','8']
+    patient_IDs = ['1','2','3','5','6','7','8']
+    # patient_IDs = ['5']
     # Type of preprocessing/features to extract
-    # preprocessing_types = ['highgamma', 'allbands', 'broadband40-150', 'articleHFB']
-    preprocessing_types = ['delta', 'theta', 'alpha', 'beta', 'lowgamma', 'highgamma', 'allbands', 'broadband40-150', 'articleHFB']
-    # preprocessing_types = ['delta', 'theta', 'alpha']
-    # Define which classifiers to experiment with: 'STMF' / 'SVM' / 'kNN' / 'RF' / 'EEGNet' / 'LSTM'
+    # preprocessing_types = ['delta', 'theta', 'alpha', 'beta', 'gamma', 'allbands']
+    preprocessing_types = ['gamma', 'allbands']
+    # Define which classifiers to experiment with: 'STMF' / 'SVM' / 'kNN' / ('RF') / 'EEGNet' / 'LSTM'
     classifiers = ['STMF']
     # Number of experiments to average accuracy over 
     # (only useful for non-deterministic classifiers)
@@ -36,8 +27,18 @@ if __name__ == '__main__':
     create_trials = True
     classify = True
     make_plots = False
-    save_results = True
+    save_results = False
     plot_results = False
+
+    # Either binary (rest vs. active) or multi-class classification
+    restvsactive = True
+    if restvsactive:
+        labels = ['Rest', 'Active']
+        classification_type = '_RvA'
+    else:
+        # Spoken phonemes
+        labels = ['/p/', '/oe/', '/a/', '/k/', 'Rest']
+        classification_type = ''
  
     if preprocess:
         for pID in patient_IDs:
@@ -64,6 +65,7 @@ if __name__ == '__main__':
                                          preprocessing_types,
                                          classifiers,
                                          classification_type,
+                                         labels,
                                          n_experiments,
                                          sampling_rate,
                                          trial_window_start,
@@ -74,19 +76,16 @@ if __name__ == '__main__':
         print_results(accuracies, n_experiments)
 
     if plot_results:
-        # plot_features_results(classifiers, preprocessing_types, patient_IDs)
-        plot_classifier_results(patient_IDs)
+        plot_features_results(classifiers, preprocessing_types, patient_IDs, restvsactive)
+        # plot_clf_optimization(['kNN'], 'gamma', patient_IDs)
+        # plot_classifier_results(patient_IDs)
 
     # TODO:
+    # - Run FFN also for CAR data (to compare with EEGNet & LSTM)
     # - Try LSTM without dropout
     # - Test multiple k's for k-NN
     # - Check if batch size matters for EEGNet(?)
-    # - Figure out how to deal with interpretation of results: rest class might be 100% accurate and influence total accuracy
-    #       Maybe use F1 score, or visualize confusion matrix, but that's not possible to do for all experiments
-    # - Find better way to store results
-    #       Might be better to put in classifier (base?) class
-    #       'Add results' functionality needed with how results are currently stored
-    #       >>> Might be better to store y_pred and y_true, to be able to reconstruct CM from stored results
+    # - Store y_pred and y_true instead of accuracy
     # - Interpretation of kernel weights EEGNet
     # - Start implementation of EEGNet to pretrain on active vs. rest
     
@@ -94,13 +93,10 @@ if __name__ == '__main__':
     #   while having normal label and normal VOT. Are those bad trials or not? (Not the case for other patients)
 
     # - Substitute last layer(s) of EEGNet by an LSTM
-    # - Test LSTM alone (without feature extraction layers)
 
     # Probably better to create 1 script for classifcation with DL models
     # And for each neural network a separate class just for init and forward
 
     # Questions:
     # - Should I try different windowsizes?
-    # - Should I implement simple FNN? (for preprocessed data)
-    # - For hyperparameter optimization: just do different LOO runs? (for example for different k's in kNN)
-    # - Is the class imbalance in RvA a problem?
+    # - Should I not use/look at F1 score (instead of accuracy)?

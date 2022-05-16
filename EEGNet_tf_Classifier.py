@@ -100,7 +100,7 @@ class EEGNet_tf_Classifier():
         # X_train = X_train[:-5]
         # y_val = y_train[-5:]
         # y_train = y_train[:-5]
-        self.fitted_model = self.model.fit(X_train, y_train, batch_size = 1, epochs = 15, verbose = 0)
+        self.fitted_model = self.model.fit(X_train, y_train, batch_size = 5, epochs = 25, verbose = 0)
 
     def predict(self, X_test):
         X_test = X_test[np.newaxis, ...]

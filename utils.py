@@ -1,3 +1,4 @@
+from unittest import result
 from patient_data_mapping import PatientDataMapper
 from preprocessing import Preprocessor
 from trials_creation import Trials_Creator
@@ -5,6 +6,7 @@ from STMF_Classifier import STMF_Classifier
 from SVM_Classifier import SVM_Classifier
 from kNN_Classifier import kNN_Classifier
 from RF_Classifier import RF_Classifier
+from FFN_Classifier import FFN_Classifier
 from EEGNet_tf_Classifier import EEGNet_tf_Classifier
 from EEGNet_torch_Classifier import EEGNet_torch_Classifier
 from LSTM_Classifier import LSTM_Classifier
@@ -101,8 +103,12 @@ def classification(classifier,
             accuracy = svm.LOO_classification(make_plots)
 
     # Classification on basis of k nearest neighbours
-    elif classifier == 'kNN':
-        kNN = kNN_Classifier(X, y, labelsdict)
+    elif classifier in ['kNN3','kNN5','kNN7','kNN9','kNN11','kNN13','kNN15','kNN17','kNN19']:
+        if len(classifier) == 4:
+            n_neighbors = int(classifier[len(classifier)-1])
+        else:
+            n_neighbors = int(classifier[len(classifier)-2:])
+        kNN = kNN_Classifier(X, y, labelsdict, n_neighbors)
         if test_index is not None:
             kNN.single_classification(test_index)
             accuracy = -1
@@ -118,8 +124,27 @@ def classification(classifier,
         if LOO:
             accuracy = rf.LOO_classification(make_plots)
 
+    # Classification with (simple) feedforward neural network
+    elif classifier in ['FFN256-128','FFN128-64','FFN64-32','FFN32-16','FFN16-8']:
+        if classifier == 'FFN256-128':
+            n_nodes = [256,128]
+        elif classifier == 'FFN128-64':
+            n_nodes = [128,64]
+        elif classifier == 'FFN64-32':
+            n_nodes = [64,32]
+        elif classifier == 'FFN32-16':
+            n_nodes = [32,16]
+        elif classifier == 'FFN16-8':
+            n_nodes = [16,8]
+        ffn = FFN_Classifier(X, y, labelsdict, n_nodes)
+        if test_index is not None:
+            ffn.single_classification(test_index)
+            accuracy = -1
+        if LOO:
+            accuracy = ffn.LOO_classification(make_plots)
+
     # Classification with EEGNet in TensorFlow
-    elif classifier == 'EEGNet' or classifier == 'EEGNet4-2' or classifier == 'EEGNet16-2':
+    elif classifier in ['EEGNet', 'EEGNet4-2', 'EEGNet16-2']:
         # Hyperparameters of EEGNet
         eegnet_kwargs = {
             'n_samples': int((trial_window_stop-trial_window_start) * sampling_rate),
@@ -162,7 +187,7 @@ def classification(classifier,
             'norm1': 1.0,
             'norm2': 0.25
         }
-        eegnet = EEGNet_torch_Classifier(X.astype('float32'), y, labelsdict, n_channels=X.shape[1], **eegnet_kwargs)
+        eegnet = EEGNet_torch_Classifier(X, y, labelsdict, n_channels=X.shape[1], **eegnet_kwargs)
         if test_index is not None:
             eegnet.single_classification(test_index)
             accuracy = -1
@@ -186,13 +211,13 @@ def classification(classifier,
         if LOO:
             accuracy = lstm.LOO_classification(make_plots)
     
-    
     return accuracy
 
 def classification_loop(patient_IDs,
                         preprocessing_types,
                         classifiers,
                         classification_type,
+                        labels,
                         n_experiments,
                         sampling_rate,
                         trial_window_start,
@@ -252,14 +277,16 @@ def print_results(accuracies, n_experiments):
                 all_accs = np.array(all_accs)
                 print(f'{patient}-{processing}:\t{np.mean(all_accs)} ({np.std(all_accs)})')
 
-def plot_features_results(classifiers, preprocessing_types, patient_IDs):
+def plot_features_results(classifiers, preprocessing_types, patient_IDs, restvsactive=False):
+    if restvsactive:
+        preprocessing_types = [ptype+'_RvA' for ptype in preprocessing_types]
     # Define plot variables
     patient_labels = []
     for patient_ID in patient_IDs:
         patient_labels.append(PatientDataMapper(patient_ID).patient)
     x_axis = np.arange(len(patient_IDs))
     width = 0.1
-    pos = [-.4, -.3, -.2, -.1, 0, .1, .2, .3, .4]
+    pos = [-.25, -.15, -.05, .05, .15, .25]
     # Read all result data
     for classifier in classifiers:
         all_data = []
@@ -274,34 +301,102 @@ def plot_features_results(classifiers, preprocessing_types, patient_IDs):
                 data.append(results)
             all_data.append(data) # Patients x Preprocessing_types
         # Barplot
-        plt.figure(figsize=(8,6))
+        plt.figure(figsize=(12,8))
         for i, data in enumerate(all_data):
             plt.bar(x_axis + pos[i], data, width=width, label=preprocessing_types[i])
-        plt.title(f'Accuracy of {classifier}')
+        if restvsactive:
+            title = f'Accuracy of {classifier} on active vs. rest using different frequency bands'
+        else:
+            title = f'Accuracy of {classifier} on 5-class classification using different frequency bands'
+        plt.title(title)
         plt.xticks(x_axis, patient_labels)
         plt.yticks(np.arange(0,1.01,0.1))
-        plt.legend()
+        plt.legend(loc = 6, bbox_to_anchor = (1, 0.5))
         plt.grid(alpha=0.35)
         plt.show()
 
+def plot_clf_optimization(classifiers, preprocessing_type, patient_IDs, restvsactive=False):
+    for classifier in classifiers:
+        # k's tested for kNN
+        if classifier == 'kNN':
+            params = ['3','5','7','9','11','13','15','17','19']
+        # Architectures tested for FFN
+        elif classifier == 'FFN':
+            params = ['256-128','128-64','64-32','32-16','16-8']
+        n_params = len(params)
+        tested_classifiers = []
+        for param in params:
+            tested_classifiers.append(f'{classifier}{param}')
+
+        if restvsactive:
+            preprocessing_types = [ptype+'_RvA' for ptype in preprocessing_types]
+        # Define plot variables
+        patient_labels = []
+        for patient_ID in patient_IDs:
+            patient_labels.append(PatientDataMapper(patient_ID).patient)
+        x_axis = np.arange(len(patient_IDs))
+        width = 0.1
+        pos = []
+        # Make 'pos' a list of len=n_params with values around 0
+        if n_params % 2 == 0: # even number of params
+            for i in np.arange(-0.05-((n_params-2)/2)*0.1, 0, 0.1):
+                pos.append(round(i,2))
+            for i in np.arange(0.05, 0.05+((n_params-2)/2)*0.1, 0.1):
+                pos.append(round(i,2))
+        else: # odd number of params
+            for i in np.arange(0-((n_params-1)/2)*0.1, 0, 0.1):
+                pos.append(round(i,2))
+            for i in np.arange(0, ((n_params+1)/2)*0.1, 0.1):
+                pos.append(round(i,2))
+
+        # Read all result data
+        all_data = []
+        for tested_clf in tested_classifiers:
+            data = []
+            directory = f'results/{tested_clf}/{preprocessing_type}'
+            for patient_ID in patient_IDs:
+                patient_data = PatientDataMapper(patient_ID)
+                file = f'{directory}/{patient_data.patient}_results.pkl'
+                with open(file, 'rb') as f:
+                    results = np.mean(pkl.load(f))
+                data.append(results)
+            all_data.append(data) # Patients x Preprocessing_types
+        # Barplot
+        plt.figure(figsize=(12,8))
+        for i, data in enumerate(all_data):
+            plt.bar(x_axis + pos[i], data, width=width, label=f'$k$ = {params[i]}')
+        if restvsactive:
+            title = f'Accuracy of {classifier} on active vs. rest'
+        else:
+            title = f'Accuracy of {classifier} on 5-class classification'
+        plt.title(title)
+        plt.xticks(x_axis, patient_labels)
+        plt.yticks(np.arange(0,1.01,0.1))
+        plt.legend(loc = 6, bbox_to_anchor = (1, 0.5))
+        plt.grid(alpha=0.35)
+        plt.show()
+    
+
 def plot_classifier_results(patient_IDs):
     result_info = {
-        'STMF': 'highgamma',
-        'SVM': 'highgamma',
-        'kNN': 'highgamma',
-        'EEGNet': 'CAR'
+        'STMF': {'ptype': 'gamma', 'title': 'STMF'},
+        'SVM': {'ptype': 'gamma', 'title': 'SVM'},
+        'kNN11': {'ptype': 'gamma', 'title': 'kNN (k=11)'},
+        'FFN256-128': {'ptype': 'gamma', 'title': 'FFN gamma'},
+        'EEGNet': {'ptype': 'CAR', 'title': 'EEGNet'}
     }
 
     patient_labels = []
     for patient_ID in patient_IDs:
         patient_labels.append(PatientDataMapper(patient_ID).patient)
     x_axis = np.arange(len(patient_IDs))
-    pos = [-0.3, -0.1, 0.1, 0.3]
-    width = 0.2
+    pos = [-0.2, -0.1, 0, 0.1, 0.2]
+    width = 0.1
 
-    all_accs, all_stds = [], []
-    for classifier, preprocessing_type in result_info.items():
+    all_accs, all_stds, titles = [], [], []
+    for classifier in result_info:
         accs, stds = [], []
+        preprocessing_type = result_info[classifier]['ptype']
         directory = f'results/{classifier}/{preprocessing_type}'
         for patient in patient_labels:
             file = f'{directory}/{patient}_results.pkl'
@@ -313,10 +408,11 @@ def plot_classifier_results(patient_IDs):
             stds.append(std)
         all_accs.append(accs)
         all_stds.append(stds)
+        titles.append(result_info[classifier]['title'])
 
     plt.figure(figsize=(8,6))
     for i, accuracies in enumerate(all_accs):
-        plt.bar(x_axis+pos[i], accuracies, yerr=all_stds[i], width=width, label=list(result_info)[i])
+        plt.bar(x_axis+pos[i], accuracies, yerr=all_stds[i], width=width, label=titles[i])
     plt.title(f'Accuracy of different classifiers')
     plt.xticks(x_axis, patient_labels)
     plt.yticks(np.arange(0,1.01,0.1))

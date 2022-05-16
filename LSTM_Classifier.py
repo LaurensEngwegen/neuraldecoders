@@ -32,7 +32,7 @@ class LSTM_Classifier():
                  n_hidden=64, 
                  n_layers=2, 
                  dropout_rate=0.2,
-                 batch_size=5,
+                 batch_size=1,
                  loss_fct=nn.CrossEntropyLoss,
                  optimizer=optim.Adam):
         # Search for cuda device
@@ -68,10 +68,10 @@ class LSTM_Classifier():
         # y = np.eye(self.n_classes)[y]
         y = torch.from_numpy(y).to(self.device)
         # Create dataloader
-        dataloader = DataLoader(TensorDataset(X, y), shuffle=False, batch_size=self.batch_size)
+        dataloader = DataLoader(TensorDataset(X, y), shuffle=True, batch_size=self.batch_size)
         return dataloader, X, y
 
-    def train(self, dataloader, n_epochs=10, verbose=0):
+    def train(self, dataloader, n_epochs=10, verbose=1):
         # Initialize optimizer and loss function
         optimizer = self.optimizer(self.model.parameters())
         lossfunction = self.loss_fct()
@@ -128,7 +128,7 @@ class LSTM_Classifier():
             train_indices = [j for j in range(len(self.y)) if j != i]
             train_dataloader, self.X_train, self.y_train = self.create_dataloader(self.X[train_indices], self.y[train_indices])
             
-            self.train(train_dataloader, n_epochs=30)
+            self.train(train_dataloader, n_epochs=15)
 
             self.model.eval()
             _, X_test, y_test = self.create_dataloader(self.X[i:i+1], self.y[i:i+1])
