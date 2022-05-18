@@ -32,7 +32,7 @@ class LSTM_Classifier():
                  n_hidden=64, 
                  n_layers=2, 
                  dropout_rate=0.2,
-                 batch_size=1,
+                 batch_size=5,
                  loss_fct=nn.CrossEntropyLoss,
                  optimizer=optim.Adam):
         # Search for cuda device
@@ -71,7 +71,7 @@ class LSTM_Classifier():
         dataloader = DataLoader(TensorDataset(X, y), shuffle=True, batch_size=self.batch_size)
         return dataloader, X, y
 
-    def train(self, dataloader, n_epochs=10, verbose=1):
+    def train(self, dataloader, n_epochs=10, verbose=0):
         # Initialize optimizer and loss function
         optimizer = self.optimizer(self.model.parameters())
         lossfunction = self.loss_fct()
@@ -119,8 +119,6 @@ class LSTM_Classifier():
     def LOO_classification(self, plot_cm=True):
         y_preds, y_trues = [], []
         correct = 0
-        # for i in range(1):
-        #     self.single_classification(i)
         
         for i in tqdm(range(len(self.y))):
             # print(f'\nTrial {i+1}/{len(self.y)}...')
@@ -136,7 +134,7 @@ class LSTM_Classifier():
             y_true = y_test.item()
             y_preds.append(y_pred)
             y_trues.append(y_true)
-            print(f"True - predicted ==> {y_true} - {y_pred}")
+            # print(f"True - predicted ==> {y_true} - {y_pred}")
             if y_pred == y_true:
                 correct += 1
         accuracy = correct/len(self.y)

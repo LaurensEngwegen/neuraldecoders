@@ -1,3 +1,4 @@
+from matplotlib.axis import XAxis
 from patient_data_mapping import PatientDataMapper
 from preprocessing import Preprocessor
 from trials_creation import Trials_Creator
@@ -17,20 +18,25 @@ import pickle as pkl
 import matplotlib.pyplot as plt
 
 # Increase font size in plots
-plt.rcParams.update({'font.size': 14})
+plt.rcParams.update({'font.size': 16})
 
 # Function to preprocess data and create trials
 def preprocessing(patient_data,
                   sampling_rate,
                   buffer, 
-                  preprocessing_type):
+                  preprocessing_type,
+                  task='phonemes'):
     # Define necessary paths
     if preprocessing_type == 'given_features':
-        data_filenames = f'data/{patient_data.patient}/{patient_data.patient}_ECoG_CAR-gammaPwr_features.mat'
+        data_filenames = f'data/{task}/{patient_data.patient}/{patient_data.patient}_ECoG_CAR-gammaPwr_features.mat'
     else:
         data_filenames = []
-        for i in range(patient_data.n_files):
-            data_filenames.append(f'data/{patient_data.patient}/{patient_data.patient}_RawData_{i+1}.mat')
+        if task == 'phonemes':
+            for i in range(patient_data.n_files):
+                data_filenames.append(f'data/{task}/{patient_data.patient}/{patient_data.patient}_RawData_{i+1}.mat')
+        else:
+            for i in range(patient_data.n_files):
+                data_filenames.append(f'data/{task}/{patient_data.patient}/{patient_data.patient}_run_{i+1}.mat')
 
     preprocessor = Preprocessor(data_filenames,
                                 patient_data = patient_data,
@@ -48,9 +54,14 @@ def trials_creation(patient_data,
                     trials_path,
                     trial_window_start,
                     trial_window_stop,
-                    restvsactive):
-
-        task_path = f'data/{patient_data.patient}/{patient_data.patient}_NEW_trial_markers.mat'
+                    restvsactive,
+                    task='phonemes'):
+        if task == 'phonemes':
+            task_path = [f'data/{task}/{patient_data.patient}/{patient_data.patient}_NEW_trial_markers.mat']
+        else:
+            task_path = []
+            for i in range(patient_data.n_files):
+                task_path.append(f'data/{task}/{patient_data.patient}/{patient_data.patient}_run_{i+1}.mat')
         # Set save_path to None to not save/overwrite trials
         Trials_Creator(task_path = task_path, 
                         ecog_data = ecog_data,
@@ -185,8 +196,19 @@ def classification(classifier,
             accuracy, y_true, y_pred = eegnet.LOO_classification(make_plots)
 
     # Classification wit (stacked) LSTM
-    elif classifier == ['LSTM256', 'LSTM128', 'LSTM64', 'LSTM32']:
-        lstm = LSTM_Classifier(X, y, labelsdict)
+    elif classifier in ['LSTM256', 'LSTM128', 'LSTM64', 'LSTM32', 'LSTM16']:
+        if classifier == 'LSTM256':
+            n_hidden = 256
+        elif classifier == 'LSTM128':
+            n_hidden = 128
+        elif classifier == 'LSTM64':
+            n_hidden = 64
+        elif classifier == 'LSTM32':
+            n_hidden = 32
+        elif classifier == 'LSTM16':
+            n_hidden = 16
+
+        lstm = LSTM_Classifier(X, y, labelsdict, n_hidden=n_hidden)
         if test_index is not None:
             lstm.single_classification(test_index)
             accuracy, y_true, y_pred = -1, -1, -1
@@ -215,7 +237,8 @@ def classification_loop(patient_IDs,
                         make_plots,
                         save_results,
                         LOO=True,
-                        test_index=None):
+                        test_index=None,
+                        task='phonemes'):
     # Create dict to store accuracies 
     # (in lists for possibility to average over multiple experiments)
     results = dict()
@@ -225,16 +248,16 @@ def classification_loop(patient_IDs,
         for preprocessing_type in preprocessing_types:
             results[classifier][preprocessing_type] = dict()
             for pID in patient_IDs:
-                patient_data = PatientDataMapper(pID)
+                patient_data = PatientDataMapper(pID, task)
                 # Path where trials are stored
-                trials_path = f'data/{patient_data.patient}/{patient_data.patient}_{preprocessing_type}{classification_type}_trials.pkl'
+                trials_path = f'data/{task}/{patient_data.patient}/{patient_data.patient}_{preprocessing_type}{classification_type}_trials.pkl'
                 # Define mapping from indices to labels (differs per patient)
                 labelsdict = {patient_data.label_indices[i]: labels[i] for i in range(len(labels))}
                 # Load (preprocessed) trials for specific patient
                 X, y = load_trials(trials_path)
                 results[classifier][preprocessing_type][patient_data.patient] = {'y_true': [], 'y_pred': []}
                 for i in range(n_experiments):
-                    print(f'\nRepetition {i+1} using \'{preprocessing_type}\' trials from patient \'{pID}\' ({X.shape[1]} channels, {X.shape[0]} trials)')
+                    print(f'\nRepetition {i+1} using \'{preprocessing_type}\' trials from patient \'{patient_data.patient}\' ({X.shape[1]} channels, {X.shape[0]} trials)')
                     print(f'Classification with {classifier}...')
                     accuracy, y_true, y_pred = classification(classifier,
                                                               X, 
@@ -249,7 +272,7 @@ def classification_loop(patient_IDs,
                     results[classifier][preprocessing_type][patient_data.patient]['y_true'].append(y_true)
                     results[classifier][preprocessing_type][patient_data.patient]['y_pred'].append(y_pred)
                 if save_results:
-                    directory = f'results/{classifier}/{preprocessing_type}{classification_type}'
+                    directory = f'results/{task}/{classifier}/{preprocessing_type}{classification_type}'
                     if not os.path.exists(directory):
                         os.makedirs(directory)
                     file = f'{directory}/{patient_data.patient}_results.pkl'
@@ -288,24 +311,25 @@ def get_accuracy(file):
 
 
 
-def plot_features_results(classifiers, preprocessing_types, patient_IDs, restvsactive=False):
+def plot_features_results(classifiers, preprocessing_types, patient_IDs, restvsactive=False, task='phonemes'):
     if restvsactive:
         preprocessing_types = [ptype+'_RvA' for ptype in preprocessing_types]
     # Define plot variables
     patient_labels = []
     for patient_ID in patient_IDs:
-        patient_labels.append(PatientDataMapper(patient_ID).patient)
+        patient_labels.append(PatientDataMapper(patient_ID, task).patient)
     x_axis = np.arange(len(patient_IDs))
     width = 0.1
-    pos = [-.25, -.15, -.05, .05, .15, .25]
+    # pos = [-.25, -.15, -.05, .05, .15, .25]
+    pos = [-.3, -.2, -.1, 0, .1, .2, .35]
     # Read all result data
     for classifier in classifiers:
         all_data = []
         for preprocessing_type in preprocessing_types:
             data = []
-            directory = f'results/{classifier}/{preprocessing_type}'
+            directory = f'results/{task}/{classifier}/{preprocessing_type}'
             for patient_ID in patient_IDs:
-                patient_data = PatientDataMapper(patient_ID)
+                patient_data = PatientDataMapper(patient_ID, task)
                 file = f'{directory}/{patient_data.patient}_results.pkl'
                 acc, _ = get_accuracy(file)
                 data.append(acc)
@@ -317,6 +341,7 @@ def plot_features_results(classifiers, preprocessing_types, patient_IDs, restvsa
                 plt.bar(x_axis + pos[i], data, width=width, label=preprocessing_types[i][:-4])
             else:
                 plt.bar(x_axis + pos[i], data, width=width, label=preprocessing_types[i])
+        plot_article_acc(x_axis, pos[len(pos)-1], width, restvsactive, task)
         if restvsactive:
             title = f'Accuracy of {classifier} on active vs. rest using different frequency bands'
         else:
@@ -329,7 +354,7 @@ def plot_features_results(classifiers, preprocessing_types, patient_IDs, restvsa
         plt.tight_layout()
         plt.show()
 
-def plot_clf_optimization(classifiers, preprocessing_type, patient_IDs, restvsactive=False):
+def plot_clf_optimization(classifiers, preprocessing_type, patient_IDs, restvsactive=False, task='phonemes'):
     for classifier in classifiers:
         # k's tested for kNN
         if classifier == 'kNN':
@@ -337,7 +362,7 @@ def plot_clf_optimization(classifiers, preprocessing_type, patient_IDs, restvsac
             labelprefix = '$k$ = '
         # Architectures tested for FFN
         elif classifier == 'FFN':
-            params = ['256-128','128-64','64-32','32-16','16-8']
+            params = ['256-128','128-64','64-32','32-16']
             labelprefix = 'FFN'
         n_params = len(params)
         tested_classifiers = []
@@ -345,11 +370,11 @@ def plot_clf_optimization(classifiers, preprocessing_type, patient_IDs, restvsac
             tested_classifiers.append(f'{classifier}{param}')
 
         if restvsactive:
-            preprocessing_types = [ptype+'_RvA' for ptype in preprocessing_types]
+            preprocessing_type = f'{preprocessing_type}_RvA'
         # Define plot variables
         patient_labels = []
         for patient_ID in patient_IDs:
-            patient_labels.append(PatientDataMapper(patient_ID).patient)
+            patient_labels.append(PatientDataMapper(patient_ID, task).patient)
         x_axis = np.arange(len(patient_IDs))
         width = 0.08
         pos = []
@@ -357,21 +382,21 @@ def plot_clf_optimization(classifiers, preprocessing_type, patient_IDs, restvsac
         if n_params % 2 == 0: # even number of params
             for i in np.arange(-0.5*width-((n_params-2)/2)*width, 0, width):
                 pos.append(round(i,2))
-            for i in np.arange(0.5*width, 0.5*width+((n_params-2)/2)*width, width):
+            for i in np.arange(0.5*width, 0.5*width+((n_params-1)/2)*width, width):
                 pos.append(round(i,2))
         else: # odd number of params
             for i in np.arange(0-((n_params-1)/2)*width, 0, width):
                 pos.append(round(i,2))
             for i in np.arange(0, ((n_params+1)/2)*width, width):
                 pos.append(round(i,2))
-
+        
         # Read all result data
         all_data = []
         for tested_clf in tested_classifiers:
             data = []
-            directory = f'results/{tested_clf}/{preprocessing_type}'
+            directory = f'results/{task}/{tested_clf}/{preprocessing_type}'
             for patient_ID in patient_IDs:
-                patient_data = PatientDataMapper(patient_ID)
+                patient_data = PatientDataMapper(patient_ID, task)
                 file = f'{directory}/{patient_data.patient}_results.pkl'
                 acc, _ = get_accuracy(file)
                 data.append(acc)
@@ -392,19 +417,19 @@ def plot_clf_optimization(classifiers, preprocessing_type, patient_IDs, restvsac
         plt.tight_layout()
         plt.show()
     
-def plot_classifier_results(patient_IDs):
+def plot_classifier_results(patient_IDs, task='phonemes'):
     result_info = {
         'STMF': {'ptype': 'gamma', 'title': 'STMF'},
         'SVM': {'ptype': 'gamma', 'title': 'SVM'},
         'kNN11': {'ptype': 'gamma', 'title': 'kNN (k=11)'},
-        'FFN128-64': {'ptype': 'gamma', 'title': 'FFN (features)'},
+        'FFN128-64': {'ptype': 'gamma', 'title': 'FFN (gamma band)'},
         'EEGNet': {'ptype': 'CAR', 'title': 'EEGNet'}
     }
-
     patient_labels = []
     for patient_ID in patient_IDs:
-        patient_labels.append(PatientDataMapper(patient_ID).patient)
+        patient_labels.append(PatientDataMapper(patient_ID, task).patient)
     x_axis = np.arange(len(patient_IDs))
+    # pos = [-0.3, -0.15, -0.05, 0.05, 0.15, 0.25]
     pos = [-0.2, -0.1, 0, 0.1, 0.2]
     width = 0.1
 
@@ -412,7 +437,7 @@ def plot_classifier_results(patient_IDs):
     for classifier in result_info:
         accs, stds = [], []
         preprocessing_type = result_info[classifier]['ptype']
-        directory = f'results/{classifier}/{preprocessing_type}'
+        directory = f'results/{task}/{classifier}/{preprocessing_type}'
         for patient in patient_labels:
             file = f'{directory}/{patient}_results.pkl'
             acc, std = get_accuracy(file)
@@ -422,14 +447,26 @@ def plot_classifier_results(patient_IDs):
         all_stds.append(stds)
         titles.append(result_info[classifier]['title'])
 
-    plt.figure(figsize=(8,6))
+    plt.figure(figsize=(12,8))
+    # Add entry to 'pos' to plot article acc.
+    # plot_article_acc(x_axis, pos[0], width, task)
     for i, accuracies in enumerate(all_accs):
         plt.bar(x_axis+pos[i], accuracies, yerr=all_stds[i], width=width, label=titles[i])
     plt.title(f'Accuracy of different classifiers')
     plt.xticks(x_axis, patient_labels)
     plt.yticks(np.arange(0,1.01,0.1))
-    plt.legend()
+    plt.legend(loc = 6, bbox_to_anchor = (1, 0.5))
     plt.grid(alpha=0.35)
     plt.tight_layout()
     plt.show()
 
+# TODO: add patient 4 acc (0.685) when data i
+def plot_article_acc(x_axis, pos, width, restvsactive=False, task='phonemes'):
+    if task == 'phonemes':
+        article_accuracies = [0.814, 0.704, 0.831, 0.741, 0, 0, 0]
+        if restvsactive:
+            article_accuracies = [0.831, 1, 1, 0.667, 0, 0, 0]
+        label = 'Article STMF'
+    else:
+        return
+    plt.bar(x_axis+pos, article_accuracies, width=width, label=label, color='lightgrey')

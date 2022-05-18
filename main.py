@@ -9,16 +9,23 @@ if __name__ == '__main__':
     trial_window_start = -0.5
     # Wherer does trial window stop relative to VOT (seconds)
     trial_window_stop = 0.5
+    # Which task (phonemes or gestures)
+    task = 'phonemes'
+    # task = 'gestures'
     # Patient data to use
     # patient_IDs = ['1','2','3','4','5','6','7','8']
     patient_IDs = ['1','2','3','5','6','7','8']
+    # patient_IDs = ['9','10','11','12','13']
     # patient_IDs = ['5']
     # Type of preprocessing/features to extract
     preprocessing_types = ['delta', 'theta', 'alpha', 'beta', 'gamma', 'allbands']
-    # preprocessing_types = ['gamma', 'allbands']
+    # preprocessing_types = ['CAR']
     # Define which classifiers to experiment with: 'STMF' / 'SVM' / 'kNN' / ('RF') / 'EEGNet' / 'LSTM'
-    classifiers = ['SVM']
-    # Number of experiments to average accuracy over 
+    # classifiers = ['FFN256-128','FFN128-64','FFN64-32','FFN32-16','FFN16-8']
+    # classifiers = ['kNN3','kNN5','kNN7','kNN9','kNN11','kNN13','kNN15','kNN17','kNN19']
+    # classifiers = ['LSTM16', 'LSTM32', 'LSTM64', 'LSTM128']
+    classifiers = ['STMF', 'SVM']
+    #  Number of experiments to average accuracy over 
     # (only useful for non-deterministic classifiers)
     n_experiments = 1
     
@@ -31,34 +38,38 @@ if __name__ == '__main__':
     plot_results = True
 
     # Either binary (rest vs. active) or multi-class classification
-    restvsactive = False
+    restvsactive = True
     if restvsactive:
         labels = ['Rest', 'Active']
         classification_type = '_RvA'
     else:
-        # Spoken phonemes
-        labels = ['/p/', '/oe/', '/a/', '/k/', 'Rest']
+        if task == 'phonemes':
+            labels = ['/p/', '/oe/', '/a/', '/k/', 'Rest']
+        else: 
+            labels = ['G1', 'G2', 'G3', 'G4'] # No rest class
         classification_type = ''
  
     if preprocess:
         for pID in patient_IDs:
-            patient_data = PatientDataMapper(pID)
+            patient_data = PatientDataMapper(pID, task)
             for ptype in preprocessing_types:
                 ecog_data, valid_points, break_points = preprocessing(patient_data, 
                                                                       sampling_rate,
                                                                       buffer, 
-                                                                      ptype)
+                                                                      ptype,
+                                                                      task)
                 if create_trials:
-                    trials_path = f'data/{patient_data.patient}/{patient_data.patient}_{ptype}{classification_type}_trials.pkl'
+                    trials_path = f'data/{task}/{patient_data.patient}/{patient_data.patient}_{ptype}{classification_type}_trials.pkl'
                     trials_creation(patient_data,
                                     ecog_data,
                                     valid_points,
                                     break_points,
                                     sampling_rate,
-                                    trials_path,
-                                    trial_window_start,
-                                    trial_window_stop,
-                                    restvsactive)
+                                    trials_path=trials_path,
+                                    trial_window_start=trial_window_start,
+                                    trial_window_stop=trial_window_stop,
+                                    restvsactive=restvsactive,
+                                    task=task)
     
     if classify:
         results = classification_loop(patient_IDs, 
@@ -72,13 +83,14 @@ if __name__ == '__main__':
                                          trial_window_stop,
                                          make_plots,
                                          save_results,
-                                         LOO=True)
+                                         LOO=True,
+                                         task=task)
         print_results(results, n_experiments)
 
     if plot_results:
-        # plot_features_results(classifiers, preprocessing_types, patient_IDs, restvsactive)
-        plot_clf_optimization(['kNN'], 'gamma', patient_IDs)
-        # plot_classifier_results(patient_IDs)
+        plot_features_results(classifiers, preprocessing_types, patient_IDs, restvsactive, task='phonemes')
+        # plot_clf_optimization(['FFN'], 'gamma', patient_IDs, restvsactive, task='phonemes')
+        # plot_classifier_results(patient_IDs, task='phonemes')
 
     # TODO:
     # - Run FFN also for CAR data (to compare with EEGNet & LSTM)

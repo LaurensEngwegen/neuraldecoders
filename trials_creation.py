@@ -28,7 +28,7 @@ class Trials_Creator():
         self.label_indices = patient_data.label_indices
         
         # Read task data
-        self.task_data = self.read_taskdata(task_path)
+        self.task_data = self.read_taskdata(task_path, break_points)
         # Downsampling if needed
         if patient_data.sampling_rate > self.sampling_rate:
             self.task_data = self.downsample_data(self.task_data, patient_data.sampling_rate)
@@ -44,10 +44,26 @@ class Trials_Creator():
         if save_path is not None:
             self.save_trials(save_path)
 
-    def read_taskdata(self, task_path):
-        task_file = h5py.File(task_path, 'r')
+    # TODO for gestures
+    def read_taskdata(self, task_path, break_points):
+        # Possibility to combine data from multiple files (for gestures data)
+        
+        task_file = h5py.File(task_path[0], 'r')
         task_data = np.array(task_file['task_performance_data'], dtype=np.int32)
         task_file.close()
+        # INCORRECT: should add ECoG_data.shape[0] to first two columns of second task_data
+        # might also want to incorporate possibility for even >2 files
+        for i in range(1, len(task_path)):
+            task_file = h5py.File(task_path[i], 'r')
+            new_taskdata = np.array(task_file['task_performance_data'], dtype=np.int32)
+            task_file.close()
+            # Second task_performance_data file (must) contain(s) sample indexes to which breakpoints must be added
+            for t in range(new_taskdata.shape[1]):
+                new_taskdata[0, t] += break_points[i]
+                if new_taskdata[1, t] != 0 and new_taskdata[1, t] != -1:
+                    new_taskdata[1, t] += break_points[i]
+            task_data = np.hstack((task_data, new_taskdata))
+        print(task_data.shape)
         return task_data
 
     def downsample_data(self, data, old_sampling_rate):
@@ -89,12 +105,15 @@ class Trials_Creator():
         print(f'Number of bad (-1) trials: {task_data[:, task_data[1, :] == -1].shape[1]}')
         print(f'Number of trials with -1 in column 3: {task_data[:, task_data[2, :] == -1].shape[1]}')
         task_data = task_data[:, task_data[1,:] != -1]
-        # Drop too early trials
-        valid_points = np.isin(task_data[0,:]+round(self.time_window_start*self.sampling_rate), valid_spectra_points)
-        task_data = task_data[:, valid_points]
-        # Drop too late trials
-        valid_points = np.isin(task_data[0,:]+raw_trial_length, valid_spectra_points)
-        task_data = task_data[:, valid_points]
+        
+        # # Drop too early trials
+        # valid_points = np.isin(task_data[0,:]+round(self.time_window_start*self.sampling_rate), valid_spectra_points)
+        # task_data = task_data[:, valid_points]
+        # print(f'After dropping too early trials: {task_data.shape}')
+        # # Drop too late trials
+        # valid_points = np.isin(task_data[0,:]+raw_trial_length, valid_spectra_points)
+        # task_data = task_data[:, valid_points]
+        # print(f'After dropping too late trials: {task_data.shape}')
         return task_data
 
     def create_trials(self, processed_data):
