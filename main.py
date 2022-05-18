@@ -14,17 +14,17 @@ if __name__ == '__main__':
     # task = 'gestures'
     # Patient data to use
     # patient_IDs = ['1','2','3','4','5','6','7','8']
-    patient_IDs = ['1','2','3','5','6','7','8']
+    # patient_IDs = ['1','2','3','5','6','7','8']
     # patient_IDs = ['9','10','11','12','13']
-    # patient_IDs = ['5']
+    patient_IDs = ['5','6','7','8']
     # Type of preprocessing/features to extract
-    preprocessing_types = ['delta', 'theta', 'alpha', 'beta', 'gamma', 'allbands']
-    # preprocessing_types = ['CAR']
+    # preprocessing_types = ['delta', 'theta', 'alpha', 'beta', 'gamma', 'allbands']
+    preprocessing_types = ['gamma']
     # Define which classifiers to experiment with: 'STMF' / 'SVM' / 'kNN' / ('RF') / 'EEGNet' / 'LSTM'
     # classifiers = ['FFN256-128','FFN128-64','FFN64-32','FFN32-16','FFN16-8']
     # classifiers = ['kNN3','kNN5','kNN7','kNN9','kNN11','kNN13','kNN15','kNN17','kNN19']
-    # classifiers = ['LSTM16', 'LSTM32', 'LSTM64', 'LSTM128']
-    classifiers = ['STMF', 'SVM']
+    # classifiers = ['LSTM32', 'LSTM64', 'LSTM128', 'LSTM256']
+    classifiers = ['STMF']
     #  Number of experiments to average accuracy over 
     # (only useful for non-deterministic classifiers)
     n_experiments = 1
@@ -32,13 +32,13 @@ if __name__ == '__main__':
     # Which functionalities to execute (True/False)
     preprocess = False
     create_trials = False
-    classify = False
-    make_plots = False
+    classify = True
+    make_plots = True
     save_results = False
-    plot_results = True
+    plot_results = False
 
     # Either binary (rest vs. active) or multi-class classification
-    restvsactive = True
+    restvsactive = False
     if restvsactive:
         labels = ['Rest', 'Active']
         classification_type = '_RvA'
@@ -88,9 +88,9 @@ if __name__ == '__main__':
         print_results(results, n_experiments)
 
     if plot_results:
-        plot_features_results(classifiers, preprocessing_types, patient_IDs, restvsactive, task='phonemes')
+        # plot_features_results(classifiers, preprocessing_types, patient_IDs, restvsactive, task='phonemes')
         # plot_clf_optimization(['FFN'], 'gamma', patient_IDs, restvsactive, task='phonemes')
-        # plot_classifier_results(patient_IDs, task='phonemes')
+        plot_classifier_results(patient_IDs, task='phonemes')
 
     # TODO:
     # - Run FFN also for CAR data (to compare with EEGNet & LSTM)

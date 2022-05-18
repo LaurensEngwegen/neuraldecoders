@@ -90,7 +90,7 @@ class STMF_Classifier():
         n_electrodes = HFB_perclass[1].shape[0]
         # Plot Z-scored HFBs
         fig, ax = plt.subplots(1, 5, figsize=(16,4))
-        plt.suptitle('Mean HFB per class')
+        plt.suptitle('Mean gamma band per class')
         for i, label in enumerate(HFB_perclass):
             ax[i].matshow(HFB_perclass[label], aspect='auto')
             ax[i].set_title(f'{self.id2label[label]}')
