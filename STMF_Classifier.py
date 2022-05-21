@@ -15,6 +15,7 @@ class STMF_Classifier():
         self.id2label = labelsdict
         self.time_window_start = time_window_start
         self.time_window_stop = time_window_stop
+        self.n_electrodes = self.X.shape[1]
         
     def train(self, X_train, y_train):
         mean_HFB_perclass = dict()
@@ -87,7 +88,6 @@ class STMF_Classifier():
             for label, hfb in HFB_perclass.items():
                 for i, electrode in enumerate(hfb):
                     hfb[i] = (electrode - np.mean(electrode)) / np.std(electrode)
-        n_electrodes = HFB_perclass[1].shape[0]
         # Plot Z-scored HFBs
         fig, ax = plt.subplots(1, 5, figsize=(16,4))
         plt.suptitle('Mean gamma band per class')
@@ -99,7 +99,7 @@ class STMF_Classifier():
             ax[i].xaxis.set_ticks((start, start+((end-start)/2), end), (self.time_window_start,0,self.time_window_stop))
             ax[i].xaxis.set_ticks_position('bottom')
             # Set correct y-ticks (electrodes)
-            ax[i].yaxis.set_ticks([i for i in range(9,n_electrodes,10)], [i for i in range(10,n_electrodes+1,10)])
+            ax[i].yaxis.set_ticks([i for i in range(9,self.n_electrodes,10)], [i for i in range(10,self.n_electrodes+1,10)])
         ax[2].set_xlabel('Time in seconds (0 at VOT)')
         ax[0].set_ylabel('Electrodes')
         fig.tight_layout()

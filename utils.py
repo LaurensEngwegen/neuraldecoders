@@ -113,7 +113,7 @@ def classification(classifier,
             accuracy, y_true, y_pred = svm.LOO_classification(make_plots)
 
     # Classification on basis of k nearest neighbours
-    elif classifier in ['kNN3','kNN5','kNN7','kNN9','kNN11','kNN13','kNN15','kNN17','kNN19']:
+    elif classifier in ['kNN1','kNN3','kNN5','kNN7','kNN9','kNN11','kNN13','kNN15','kNN17','kNN19']:
         if len(classifier) == 4:
             n_neighbors = int(classifier[len(classifier)-1])
         else:
@@ -358,7 +358,7 @@ def plot_clf_optimization(classifiers, preprocessing_type, patient_IDs, restvsac
     for classifier in classifiers:
         # k's tested for kNN
         if classifier == 'kNN':
-            params = ['3','5','7','9','11','13','15','17','19']
+            params = ['1','3','5','7','9','11','13','15','17','19']
             labelprefix = '$k$ = '
         # Architectures tested for FFN
         elif classifier == 'FFN':
@@ -421,10 +421,15 @@ def plot_classifier_results(patient_IDs, task='phonemes'):
     result_info = {
         'STMF': {'ptype': 'gamma', 'title': 'STMF'},
         'SVM': {'ptype': 'gamma', 'title': 'SVM'},
-        'kNN11': {'ptype': 'gamma', 'title': 'kNN (k=11)'},
-        'FFN128-64': {'ptype': 'gamma', 'title': 'FFN (gamma band)'},
-        'EEGNet': {'ptype': 'CAR', 'title': 'EEGNet'}
     }
+    if task == 'phonemes':
+        result_info['kNN11'] = {'ptype': 'gamma', 'title': 'kNN (k=11)'}
+        result_info['FFN128-64'] = {'ptype': 'gamma', 'title': 'FFN (gamma band)'}
+    else:
+        result_info['kNN3'] = {'ptype': 'gamma', 'title': 'kNN (k=11)'}
+        result_info['FFN64-32'] = {'ptype': 'gamma', 'title': 'FFN (gamma band)'}
+    result_info['EEGNet'] = {'ptype': 'CAR', 'title': 'EEGNet'}
+    
     patient_labels = []
     for patient_ID in patient_IDs:
         patient_labels.append(PatientDataMapper(patient_ID, task).patient)

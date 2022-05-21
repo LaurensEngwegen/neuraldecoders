@@ -34,7 +34,7 @@ class Preprocessor():
             self.n_channels = 0
             for channel_set in self.HDecog_channels:
                 self.n_channels += len(channel_set)
-            self.ecog_data, self.valid_spectra_pnts, self.break_points = self.read_raw_data(data_filename, patient_data.ecog_datakey)
+            self.ecog_data, self.valid_spectra_pnts, self.break_points = self.read_raw_data(data_filename)
 
         print(f'\n\nStart preprocessing for patient \'{patient_data.patient}\'\n')
 
@@ -90,7 +90,7 @@ class Preprocessor():
             print(f'\nvalid_spectra_pnts:\n{valid_spectra_pnts.shape}')
         return ecog_params, dataStructure, data_params, ecog_data, valid_spectra_pnts
 
-    def read_raw_data(self, data_filenames, ecog_datakey):
+    def read_raw_data(self, data_filenames):
         # Read the files in data_filenames
         data_dicts = []
         for datafile in data_filenames:
@@ -101,7 +101,7 @@ class Preprocessor():
         valid_points = []
         begin_point = 0
         for data_i in range(len(data_dicts)):
-            n_samples = data_dicts[data_i][ecog_datakey].shape[1]
+            n_samples = data_dicts[data_i]['ECoG_data'].shape[1]
             for j in range(begin_point+self.buffer, begin_point+n_samples-self.buffer):
                 valid_points.append(j)
             begin_point += n_samples
@@ -109,16 +109,16 @@ class Preprocessor():
         # Concatenate data from different files
         ecog_data = np.empty([self.n_channels,0])
         for data_i, data_dict in enumerate(data_dicts):
-            new_ecog_data = np.array(data_dict[ecog_datakey][self.HDecog_channels[0]])
+            new_ecog_data = np.array(data_dict['ECoG_data'][self.HDecog_channels[0]])
             for i in range(1, len(self.HDecog_channels)):
-                new_ecog_data = np.vstack((new_ecog_data, data_dict[ecog_datakey][self.HDecog_channels[i]]))
+                new_ecog_data = np.vstack((new_ecog_data, data_dict['ECoG_data'][self.HDecog_channels[i]]))
             ecog_data = np.hstack((ecog_data, new_ecog_data))
 
         # Define breakpoints (points that split files)
         break_points = [0]
         point = 0
         for i in range(len(data_dicts)):
-            point += data_dicts[i][ecog_datakey].shape[1]
+            point += data_dicts[i]['ECoG_data'].shape[1]
             break_points.append(point)
         return ecog_data, valid_points, break_points
 

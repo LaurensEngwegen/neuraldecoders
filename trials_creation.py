@@ -105,7 +105,7 @@ class Trials_Creator():
         print(f'Number of bad (-1) trials: {task_data[:, task_data[1, :] == -1].shape[1]}')
         print(f'Number of trials with -1 in column 3: {task_data[:, task_data[2, :] == -1].shape[1]}')
         task_data = task_data[:, task_data[1,:] != -1]
-        
+
         # # Drop too early trials
         # valid_points = np.isin(task_data[0,:]+round(self.time_window_start*self.sampling_rate), valid_spectra_points)
         # task_data = task_data[:, valid_points]
@@ -124,7 +124,7 @@ class Trials_Creator():
         # Transpose taskdata to get [trials, info]
         task_data = self.task_data.T
         for trial in task_data:
-            # Create trial from VOT if active trial
+            # Active trial: create trial from VOT
             if trial[3] in self.label_indices[:-1]:
                 # Need to check this because with extracted features shape is [E x B x T]
                 # Otherwise (raw or CAR data) just [E x T]
@@ -132,18 +132,18 @@ class Trials_Creator():
                     data.append(processed_data[:, :, trial[1]+startpoint:trial[1]+endpoint])
                 else:
                     data.append(processed_data[:, trial[1]+startpoint:trial[1]+endpoint])
-                # Store 1 if rest vs. active classifcation, else store phoneme index
+                # Store 1 if rest vs. active classifcation, else store class index
                 if self.restvsactive:
                     labels.append(1)
                 else:
                     labels.append(trial[3])
-            # Create trial from QOT if rest trial
+            # Rest trial: create trial from COT
             elif trial[3] == self.label_indices[-1]:
                 if len(processed_data.shape) == 3:
                     data.append(processed_data[:, :, trial[0]:trial[0]+totalpoints])
                 else:
                     data.append(processed_data[:, trial[0]:trial[0]+totalpoints])
-                # Store 0 if rest vs. active classifcation, else store phoneme index
+                # Store 0 if rest vs. active classifcation, else store class index
                 if self.restvsactive:
                     labels.append(0)
                 else:

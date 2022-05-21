@@ -30,9 +30,9 @@ class LSTMModel(nn.Module):
 class LSTM_Classifier():
     def __init__(self, X, y, labelsdict, 
                  n_hidden=64, 
-                 n_layers=2, 
-                 dropout_rate=0.2,
-                 batch_size=5,
+                 n_layers=1, 
+                 dropout_rate=0.0,
+                 batch_size=1,
                  loss_fct=nn.CrossEntropyLoss,
                  optimizer=optim.Adam):
         # Search for cuda device
