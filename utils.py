@@ -31,10 +31,10 @@ def preprocessing(patient_data,
         data_filenames = f'data/{task}/{patient_data.patient}/{patient_data.patient}_ECoG_CAR-gammaPwr_features.mat'
     else:
         data_filenames = []
-        if task == 'phonemes':
+        if task == 'phonemes' or task == 'phonemes_noRest':
             for i in range(patient_data.n_files):
-                data_filenames.append(f'data/{task}/{patient_data.patient}/{patient_data.patient}_RawData_{i+1}.mat')
-        else:
+                data_filenames.append(f'data/phonemes/{patient_data.patient}/{patient_data.patient}_RawData_{i+1}.mat')
+        else: # gestures
             for i in range(patient_data.n_files):
                 data_filenames.append(f'data/{task}/{patient_data.patient}/{patient_data.patient}_run_{i+1}.mat')
 
@@ -56,9 +56,9 @@ def trials_creation(patient_data,
                     trial_window_stop,
                     restvsactive,
                     task='phonemes'):
-        if task == 'phonemes':
-            task_path = [f'data/{task}/{patient_data.patient}/{patient_data.patient}_NEW_trial_markers.mat']
-        else:
+        if task == 'phonemes' or task == 'phonemes_noRest':
+            task_path = [f'data/phonemes/{patient_data.patient}/{patient_data.patient}_NEW_trial_markers.mat']
+        else: # gestures
             task_path = []
             for i in range(patient_data.n_files):
                 task_path.append(f'data/{task}/{patient_data.patient}/{patient_data.patient}_run_{i+1}.mat')
@@ -72,7 +72,8 @@ def trials_creation(patient_data,
                         save_path = trials_path,
                         time_window_start = trial_window_start,
                         time_window_stop = trial_window_stop,
-                        restvsactive = restvsactive)
+                        restvsactive = restvsactive,
+                        task = task)
 
 # Function to load trials
 def load_trials(trials_path):
@@ -358,7 +359,7 @@ def plot_clf_optimization(classifiers, preprocessing_type, patient_IDs, restvsac
     for classifier in classifiers:
         # k's tested for kNN
         if classifier == 'kNN':
-            params = ['1','3','5','7','9','11','13','15','17','19']
+            params = ['3','5','7','9','11','13','15','17','19']
             labelprefix = '$k$ = '
         # Architectures tested for FFN
         elif classifier == 'FFN':
@@ -424,10 +425,15 @@ def plot_classifier_results(patient_IDs, task='phonemes'):
     }
     if task == 'phonemes':
         result_info['kNN11'] = {'ptype': 'gamma', 'title': 'kNN (k=11)'}
-        result_info['FFN128-64'] = {'ptype': 'gamma', 'title': 'FFN (gamma band)'}
+        # result_info['FFN128-64'] = {'ptype': 'gamma', 'title': 'FFN (gamma band)'}
+    elif task == 'phonemes_noRest':
+
+        result_info['kNN11'] = {'ptype': 'gamma', 'title': 'kNN (k=11)'}
+
     else:
-        result_info['kNN3'] = {'ptype': 'gamma', 'title': 'kNN (k=11)'}
-        result_info['FFN64-32'] = {'ptype': 'gamma', 'title': 'FFN (gamma band)'}
+        result_info['kNN3'] = {'ptype': 'gamma', 'title': 'kNN (k=3)'}
+        # result_info['FFN64-32'] = {'ptype': 'gamma', 'title': 'FFN (gamma band)'}
+    
     result_info['EEGNet'] = {'ptype': 'CAR', 'title': 'EEGNet'}
     
     patient_labels = []

@@ -14,6 +14,7 @@ class Trials_Creator():
                  save_path=None, 
                  time_window_start=-0.5, 
                  time_window_stop=0.5,
+                 task='phonemes',
                  restvsactive=False):
         # Hyperparameters for trial construction
         self.sampling_rate = sampling_rate
@@ -21,6 +22,8 @@ class Trials_Creator():
         self.time_window_stop = time_window_stop # seconds
         self.offset = patient_data.VOT_offset # samples
 
+        # Either 'phonemes', 'phonemes_noRest' or 'gestures' (5class, 4class, 4class)
+        self.task = task
         # Whether binary (rest vs. active) or multi-class classification
         self.restvsactive = restvsactive
 
@@ -44,7 +47,6 @@ class Trials_Creator():
         if save_path is not None:
             self.save_trials(save_path)
 
-    # TODO for gestures
     def read_taskdata(self, task_path, break_points):
         # Possibility to combine data from multiple files (for gestures data)
         
@@ -124,34 +126,78 @@ class Trials_Creator():
         # Transpose taskdata to get [trials, info]
         task_data = self.task_data.T
         for trial in task_data:
+            x, y = self.get_data(processed_data, trial, startpoint, endpoint, totalpoints)
+            # -1 is returned if trial is not wanted for the specific task
+            if y != -1:
+                data.append(x)
+                labels.append(y)
+        data = np.array(data)
+        labels = np.array(labels)
+        print(f'Shape trials data: {data.shape}')
+        return data, labels
+
+    def get_data(self, processed_data, trial, startpoint, endpoint, totalpoints):
+        '''
+        trial is vector consisting of [COT, VOT/MOT, _, label]
+        '''
+        if self.task == 'phonemes':
             # Active trial: create trial from VOT
             if trial[3] in self.label_indices[:-1]:
                 # Need to check this because with extracted features shape is [E x B x T]
                 # Otherwise (raw or CAR data) just [E x T]
                 if len(processed_data.shape) == 3:
-                    data.append(processed_data[:, :, trial[1]+startpoint:trial[1]+endpoint])
+                    data = processed_data[:, :, trial[1]+startpoint:trial[1]+endpoint]
                 else:
-                    data.append(processed_data[:, trial[1]+startpoint:trial[1]+endpoint])
+                    data = processed_data[:, trial[1]+startpoint:trial[1]+endpoint]
                 # Store 1 if rest vs. active classifcation, else store class index
                 if self.restvsactive:
-                    labels.append(1)
+                    label = 1
                 else:
-                    labels.append(trial[3])
+                    label = trial[3]
+                return data, label
             # Rest trial: create trial from COT
             elif trial[3] == self.label_indices[-1]:
                 if len(processed_data.shape) == 3:
-                    data.append(processed_data[:, :, trial[0]:trial[0]+totalpoints])
+                    data = processed_data[:, :, trial[0]:trial[0]+totalpoints]
                 else:
-                    data.append(processed_data[:, trial[0]:trial[0]+totalpoints])
+                    data = processed_data[:, trial[0]:trial[0]+totalpoints]
                 # Store 0 if rest vs. active classifcation, else store class index
                 if self.restvsactive:
-                    labels.append(0)
+                    label = 0
                 else:
-                    labels.append(trial[3])
-        data = np.array(data)
-        labels = np.array(labels)
-        print(f'Shape trials data: {data.shape}')
-        return data, labels
+                    label = trial[3]
+                return data, label
+            else: # Labels not in self.label_indices, i.e. not used here
+                return -1, -1
+
+        elif self.task == 'phonemes_noRest':
+            # ONLY include active trials. self.label_indices contains rest class at last index
+            if trial[3] in self.label_indices[:-1]:
+                # Need to check this because with extracted features shape is [E x B x T]
+                # Otherwise (raw or CAR data) just [E x T]
+                if len(processed_data.shape) == 3:
+                    data = processed_data[:, :, trial[1]+startpoint:trial[1]+endpoint]
+                else:
+                    data = processed_data[:, trial[1]+startpoint:trial[1]+endpoint]
+                label = trial[3]
+                return data, label
+            else:
+                # Rest class: not wanted, return -1 and check for -1 in trialscreation
+                return -1, -1
+        
+        else: # gestures
+            # Include all trials
+            if trial[3] in self.label_indices:
+                # Need to check this because with extracted features shape is [E x B x T]
+                # Otherwise (raw or CAR data) just [E x T]
+                if len(processed_data.shape) == 3:
+                    data = processed_data[:, :, trial[1]+startpoint:trial[1]+endpoint]
+                else:
+                    data = processed_data[:, trial[1]+startpoint:trial[1]+endpoint]
+                label = trial[3]
+                return data, label
+            else: # Label index that is not wanted, return -1 and check for -1 in trialscreation
+                return -1, -1
 
     def print_nr_trials(self):
         print('\nNumber of trials')

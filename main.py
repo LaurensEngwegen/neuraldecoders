@@ -5,32 +5,32 @@ if __name__ == '__main__':
     sampling_rate = 512
     # Number of samples at beginning and end of file that should be excluded
     buffer = 64
-    # Which task (phonemes or gestures)
-    task = 'phonemes'
-    # task = 'gestures'
+    # Which task (phonemes, phonemes_noRest, or gestures)
+    task = 'gestures'
     # Patient data to use
-    patient_IDs = ['1','2','3','4','5','6','7','8']
-    # patient_IDs = ['1','2','3','5','6','7','8']
-    # patient_IDs = ['9','10','11','12','13']
-    # patient_IDs = ['4']
+    # patient_IDs = ['1','2','3','4','5','6','7','8']
+    # patient_IDs = ['1','2','3','4','5']
+    # patient_IDs = ['6','7','8']
+    patient_IDs = ['9','10','11','12','13']
+    # patient_IDs = ['1']
     # Type of preprocessing/features to extract
     # preprocessing_types = ['delta', 'theta', 'alpha', 'beta', 'gamma', 'allbands']
-    preprocessing_types = ['CAR']
-    # Define which classifiers to experiment with: 'STMF' / 'SVM' / 'kNN' / ('RF') / 'EEGNet' / 'LSTM'
+    preprocessing_types = ['gamma']
+    # Define which classifiers to experiment with: 'STMF' / 'SVM' / 'kNN' / ('RF') / 'FFN' / 'EEGNet' / 'LSTM'
     classifiers = ['FFN256-128','FFN128-64','FFN64-32','FFN32-16']
-    # classifiers = ['kNN3','kNN5','kNN7','kNN9','kNN11','kNN13','kNN15','kNN17','kNN19']
+    # classifiers = ['kNN3','kNN5','kNN7','kNN9','kNN11','kNN13','kNN15','kNN17','kNN19', 'STMF', 'SVM']
     # classifiers = ['LSTM32', 'LSTM64', 'LSTM128', 'LSTM256']
     # classifiers = ['EEGNet']
-    # classifiers = ['STMF', 'SVM']
+    # classifiers = ['STMF']
     #  Number of experiments to average accuracy over 
     # (only useful for non-deterministic classifiers)
-    n_experiments = 10
+    n_experiments = 5
     
     # Which functionalities to execute (True/False)
     preprocess = False
     create_trials = False
     classify = True
-    make_plots = False
+    make_plots = False # Mean freq band and confusion matrix
     save_results = True
     plot_results = False
     # Either binary (rest vs. active) or multi-class classification
@@ -38,6 +38,12 @@ if __name__ == '__main__':
     
     if task == 'phonemes':
         labels = ['/p/', '/oe/', '/a/', '/k/', 'Rest']
+        # Where does trial window start relative to VOT (seconds)
+        trial_window_start = -0.5
+        # Where does trial window stop relative to VOT (seconds)
+        trial_window_stop = 0.5
+    elif task == 'phonemes_noRest':
+        labels = ['/p/', '/oe/', '/a/', '/k/']
         # Where does trial window start relative to VOT (seconds)
         trial_window_start = -0.5
         # Where does trial window stop relative to VOT (seconds)
@@ -65,6 +71,7 @@ if __name__ == '__main__':
                                                                       ptype,
                                                                       task)
                 if create_trials:
+                    # Set trials_path to None to not save created trials
                     trials_path = f'data/{task}/{patient_data.patient}/{patient_data.patient}_{ptype}{classification_type}_trials.pkl'
                     trials_creation(patient_data,
                                     ecog_data,
@@ -95,11 +102,11 @@ if __name__ == '__main__':
 
     if plot_results:
         # plot_features_results(classifiers, preprocessing_types, patient_IDs, restvsactive, task='phonemes')
-        # plot_clf_optimization(['kNN', 'FFN'], 'gamma', patient_IDs, restvsactive, task='gestures')
-        plot_classifier_results(patient_IDs, task='gestures')
+        # plot_clf_optimization(['kNN'], 'gamma', patient_IDs, restvsactive, task=task)
+        plot_classifier_results(patient_IDs, task=task)
 
     # TODO:
-    # - Run 4-class phoneme classification
+    # - Add print info (nr. of experiments) when creating plots
     # - Fix HFB plotting (to be compatible with different number of classes)
     # - FFN: run 5 more times for 1,2,3,5,6,7,8
     # - Run FFN also for CAR data (to compare with EEGNet & LSTM)
@@ -118,3 +125,9 @@ if __name__ == '__main__':
     # Questions:
     # - Should I try different windowsizes?
     # - Should I not use/look at F1 score (instead of accuracy)?
+
+    # Correct results (without removing 'too early' and 'too late' trials):
+    # - Phonemes: kNN, STMF, SVM, EEGNet
+    # - Phonemes_noRest: kNN, STMF, SVM, EEGNet
+    # - Phonemes RvA: STMF
+    # - Gestures: kNN, STMF, SVM, (EEGNet: results with old code, but too early/late removed, so should be correct)
