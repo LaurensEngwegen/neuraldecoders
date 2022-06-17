@@ -1,3 +1,4 @@
+from tabnanny import verbose
 from tensorflow.keras.models import Model
 from tensorflow.keras.layers import Dense, Activation, Permute, Dropout
 from tensorflow.keras.layers import Conv2D, MaxPooling2D, AveragePooling2D
@@ -10,6 +11,7 @@ from tensorflow.keras.constraints import max_norm
 from tensorflow.keras import backend as K
 
 from tensorflow.keras import utils as np_utils
+import tensorflow as tf
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -29,7 +31,7 @@ class EEGNet_tf_Classifier():
                  D = 2, 
                  F2 = 16, 
                  norm_rate = 0.25, 
-                 dropoutType = 'Dropout',):
+                 dropoutType = 'Dropout'):
         self.X = X
         self.y = y
         self.labels = []
@@ -39,7 +41,7 @@ class EEGNet_tf_Classifier():
         self.y = np_utils.to_categorical(self.y)
         self.id2label = labelsdict
         self.n_classes = len(self.labels)
-
+        
         # Variables and parameters needed for model
         self.n_channels = n_channels
         self.n_samples = n_samples
@@ -93,16 +95,10 @@ class EEGNet_tf_Classifier():
         model.compile(loss='categorical_crossentropy', optimizer='adam', metrics = ['accuracy'])
         return model
 
-    # TODO: fitted_model (History object) is probably not needed
-    # TODO: create custom training loop
-    def train(self, X_train, y_train):
-        # X_val = X_train[-5:]
-        # X_train = X_train[:-5]
-        # y_val = y_train[-5:]
-        # y_train = y_train[:-5]
-        self.fitted_model = self.model.fit(X_train, y_train, batch_size = 5, epochs = 25, verbose = 0)
+    def train(self, X_train, y_train, batch_size=5, epochs=25, verbose=0):
+        self.model.fit(X_train, y_train, batch_size=batch_size, epochs=epochs, verbose=verbose)
 
-    def predict(self, X_test):
+    def single_prediction(self, X_test):
         X_test = X_test[np.newaxis, ...]
         y_pred = self.model.predict(X_test)
         return y_pred
@@ -115,14 +111,17 @@ class EEGNet_tf_Classifier():
         y_true = np.argmax(self.y[test_index])
         print(f'Predicted: {y_pred}, true: {y_true}')
 
-    def LOO_classification(self, plot_cm=True):
+    def LOO_classification(self, plot_cm=True, pretrained_model=None, epochs=25):
         y_preds, y_trues = [], []
         correct = 0
         for i in tqdm(range(len(self.y))):
-            self.model = self.initialize_model()
+            if pretrained_model is None:
+                self.model = self.initialize_model()
+            else:
+                self.model = self.load_model(pretrained_model)
             train_indices = [j for j in range(len(self.y)) if j != i]
-            self.train(self.X[train_indices], self.y[train_indices])
-            y_pred = np.argmax(self.predict(self.X[i]))
+            self.train(self.X[train_indices], self.y[train_indices], epochs=epochs)
+            y_pred = np.argmax(self.single_prediction(self.X[i]))
             y_true = np.argmax(self.y[i])
             y_preds.append(y_pred)
             y_trues.append(y_true)
@@ -137,3 +136,31 @@ class EEGNet_tf_Classifier():
             ConfusionMatrixDisplay.from_predictions(y_trues, y_preds, display_labels=self.labels)
             plt.show()
         return accuracy, y_trues, y_preds
+
+    def finetune(self, model_savefile, make_plots):
+        acc, y_trues, y_preds = self.LOO_classification(pretrained_model=model_savefile, plot_cm=make_plots, epochs=25)
+        return acc, y_trues, y_preds     
+
+    def pretrain(self, model_path, batch_size=5, epochs=25, verbose=0):
+        self.model = self.initialize_model()
+        self.train(self.X, self.y, batch_size=batch_size, epochs=epochs, verbose=verbose)
+        y_pred = np.argmax(self.model.predict(self.X), axis=1)
+        y_true = np.argmax(self.y, axis=1)
+        correct = np.count_nonzero(y_pred==y_true)
+        print(f'Pretrain accuracy = {correct/len(self.y)}')
+        print(f'correct: {correct}, len(y): {len(self.y)}')
+        self.model.save(model_path)
+
+
+    def load_model(self, model_path):
+        # Load pretrained model from model_file
+        pretrained_model = tf.keras.models.load_model(model_path)
+        # Use all layers except last 3 (Dense/kernelconstraint/softmax)
+        x = pretrained_model.layers[-3].output
+        # Define new last layers
+        x = Dense(self.n_classes, name='dense', kernel_constraint=max_norm(self.norm_rate))(x)
+        softmax = Activation('softmax', name='softmax')(x)
+        # Construct and compile new model
+        model = Model(inputs=pretrained_model.input, outputs=softmax)
+        model.compile(loss='categorical_crossentropy', optimizer='adam', metrics=['accuracy'])
+        return model
