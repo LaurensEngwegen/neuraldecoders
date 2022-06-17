@@ -1,6 +1,7 @@
 # Folders with sensitive data
 patient_data_mapping.py
 data/
+models/
 results/
 figures/
 matlab_scripts/
