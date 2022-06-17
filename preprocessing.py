@@ -4,7 +4,7 @@ import pycwt
 import h5py
 from tqdm import tqdm
 import scipy.signal
-from mne.filter import notch_filter
+from mne.filter import notch_filter, filter_data
 
 class Preprocessor():
     def __init__(self, 
@@ -14,6 +14,7 @@ class Preprocessor():
                  buffer=64,
                  preprocessing_type='raw'):
         
+        self.patient_data = patient_data
         self.sampling_rate = sampling_rate
         self.buffer = buffer # Samples at beginning and end of file to exclude
         self.preprocessing_type = preprocessing_type
@@ -43,7 +44,7 @@ class Preprocessor():
             self.ecog_data, self.valid_spectra_pnts, self.break_points = self.downsampling(self.ecog_data, patient_data.sampling_rate)
         
         # Notch filtering
-        self.ecog_data = self.notch_filter(self.ecog_data)
+        self.ecog_data = self.apply_filter(self.ecog_data)
 
         if self.preprocessing_type != 'raw' and self.preprocessing_type != 'given_features':
             # Comman average referencing
@@ -137,10 +138,12 @@ class Preprocessor():
 
         return np.array(downsampled_data), valid_points, breakpoints
 
-    def notch_filter(self, data):
+    def apply_filter(self, data):
         print(f'Notch filtering...')
         freqs = np.array([50, 100])
-        data = notch_filter(data, self.sampling_rate, freqs, verbose=False)
+        data = notch_filter(x=data, Fs=self.sampling_rate, freqs=freqs, verbose=True)
+        if self.patient_data.ID == '7.2':
+            data = filter_data(data=data, sfreq=self.sampling_rate, l_freq=150, h_freq=110, l_trans_bandwidth=0.5, h_trans_bandwidth=0.5, verbose=True)
         return data
 
     def CAR(self, data, CAR_channels):
@@ -168,8 +171,13 @@ class Preprocessor():
             'beta': np.arange(13,31),
             # 'lowgamma': np.arange(30,71),
             # 'highgamma': np.arange(70,151),
-            'gamma': np.arange(40,151) # Previously called 'broadband40-150'
+            'gamma': np.arange(40,151), # Previously called 'broadband40-150'
+            'gestures_gamma': np.arange(70,126),
+            'gestures_gamma_2': np.arange(70,126)
         }
+        if self.patient_data.ID == '7.2':
+            freq_bands['gamma'] = np.arange(40,111)
+
         if self.preprocessing_type == 'allbands':
             freqs = [freq_bands['delta'], freq_bands['theta'], freq_bands['alpha'], freq_bands['beta'], freq_bands['gamma']]
         elif self.preprocessing_type == 'articleHFB':
@@ -217,7 +225,10 @@ class Preprocessor():
 
     def smooth_spectra(self, data):
         # Smoothing
-        smooth_window = 0.1 # seconds
+        if self.preprocessing_type == 'gestures_gamma':
+            smooth_window = 0.5 # seconds
+        else:
+            smooth_window = 0.1 # seconds
         smoothkernel_size = round(smooth_window*self.sampling_rate)
         kernel = np.ones(smoothkernel_size)
         print(f'Smoothing spectra (with kernel size {smoothkernel_size})...')
