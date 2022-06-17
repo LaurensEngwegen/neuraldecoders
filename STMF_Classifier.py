@@ -28,8 +28,9 @@ class STMF_Classifier():
     def predict(self, X_test):
         highest_cor = -1000
         for key, mean_signal in self.mean_HFB_perclass.items():
+            # print(f'shape of vector {mean_signal.shape}')
             corr = np.corrcoef(mean_signal.flatten(), X_test.flatten())[0,1]
-            if corr > highest_cor:
+            if corr >= highest_cor:
                 highest_cor = corr
                 y_pred = key
         return y_pred
@@ -39,6 +40,7 @@ class STMF_Classifier():
         correct = 0
         total_HFB_perclass = {label: None for label in np.unique(self.y)}
         for i in tqdm(range(len(self.y))):
+            # print(f'\nTrial {i+1}')
             train_indices = [j for j in range(len(self.y)) if j != i]
             self.train(self.X[train_indices], self.y[train_indices])
             y_pred = self.predict(self.X[i])
@@ -76,7 +78,7 @@ class STMF_Classifier():
         print(f'Predicted: {y_pred}, true: {y_true}')
         self.plot_HFB_perclass(self.mean_HFB_perclass)
 
-    def plot_HFB_perclass(self, HFB_perclass, zscore=True):
+    def plot_HFB_perclass(self, HFB_perclass, zscore=False):
         # Check if it possible to plot (i.e. only one averaged frequency band)
         for label, hfb in HFB_perclass.items():
             if hfb.shape[1] == 1:
@@ -92,7 +94,7 @@ class STMF_Classifier():
         fig, ax = plt.subplots(1, 5, figsize=(16,4))
         plt.suptitle('Mean gamma band per class')
         for i, label in enumerate(HFB_perclass):
-            ax[i].matshow(HFB_perclass[label], aspect='auto')
+            ax[i].matshow(HFB_perclass[label], aspect='auto', cmap='jet')
             ax[i].set_title(f'{self.id2label[label]}')
             # Set correct x-ticks (here: -0.5, 0, 0.5 with 0=VOT)
             start, end = ax[i].get_xlim()
