@@ -22,6 +22,8 @@ class Trials_Creator():
         self.time_window_stop = time_window_stop # seconds
         self.offset = patient_data.VOT_offset # samples
 
+        self.patient_data = patient_data
+
         # Either 'phonemes', 'phonemes_noRest' or 'gestures' (5class, 4class, 4class)
         self.task = task
         # Whether binary (rest vs. active) or multi-class classification
@@ -103,7 +105,7 @@ class Trials_Creator():
         #             print(f'Dropped noisy trial, index: {i}')
                     # task_data[1,i] = -1+self.offset
 
-        # Drop bad trials indicated with -1
+        # Drop bad trials indicated with -1 in column 2
         print(f'Number of bad (-1) trials: {task_data[:, task_data[1, :] == -1].shape[1]}')
         print(f'Number of trials with -1 in column 3: {task_data[:, task_data[2, :] == -1].shape[1]}')
         task_data = task_data[:, task_data[1,:] != -1]
@@ -129,8 +131,9 @@ class Trials_Creator():
             x, y = self.get_data(processed_data, trial, startpoint, endpoint, totalpoints)
             # -1 is returned if trial is not wanted for the specific task
             if y != -1:
-                data.append(x)
-                labels.append(y)
+                for i in range(len(x)):
+                    data.append(x[i])
+                    labels.append(y[i])
         data = np.array(data)
         labels = np.array(labels)
         print(f'Shape trials data: {data.shape}')
@@ -139,9 +142,10 @@ class Trials_Creator():
     def get_data(self, processed_data, trial, startpoint, endpoint, totalpoints):
         '''
         trial is vector consisting of [COT, VOT/MOT, _, label]
+        
         '''
         if self.task == 'phonemes':
-            # Active trial: create trial from VOT
+            # Active trial: create trial from trial[1]
             if trial[3] in self.label_indices[:-1]:
                 # Need to check this because with extracted features shape is [E x B x T]
                 # Otherwise (raw or CAR data) just [E x T]
@@ -154,7 +158,7 @@ class Trials_Creator():
                     label = 1
                 else:
                     label = trial[3]
-                return data, label
+                return [data], [label]
             # Rest trial: create trial from COT
             elif trial[3] == self.label_indices[-1]:
                 if len(processed_data.shape) == 3:
@@ -166,7 +170,7 @@ class Trials_Creator():
                     label = 0
                 else:
                     label = trial[3]
-                return data, label
+                return [data], [label]
             else: # Labels not in self.label_indices, i.e. not used here
                 return -1, -1
 
@@ -180,12 +184,12 @@ class Trials_Creator():
                 else:
                     data = processed_data[:, trial[1]+startpoint:trial[1]+endpoint]
                 label = trial[3]
-                return data, label
+                return [data], [label]
             else:
                 # Rest class: not wanted, return -1 and check for -1 in trialscreation
                 return -1, -1
         
-        else: # gestures
+        elif self.task == 'gestures':
             # Include all trials
             if trial[3] in self.label_indices:
                 # Need to check this because with extracted features shape is [E x B x T]
@@ -195,9 +199,41 @@ class Trials_Creator():
                 else:
                     data = processed_data[:, trial[1]+startpoint:trial[1]+endpoint]
                 label = trial[3]
-                return data, label
+                return [data], [label]
             else: # Label index that is not wanted, return -1 and check for -1 in trialscreation
                 return -1, -1
+
+        elif self.task == 'pretrain_phonemes':
+            data, labels = [], []
+            begin = trial[0]
+            window_size = int(self.sampling_rate * 0.2) # 0.2 seconds
+            # Word pronounciation trials
+            if self.patient_data.ID in ['1','7','8']:
+                for _ in range(5):
+                    end = begin+totalpoints
+                    data.append(processed_data[:, begin:end])
+                    begin += window_size
+                    labels.append(trial[3])
+            # Long activity/rest in the task
+            else:
+                for _ in range(50):
+                    end = begin+totalpoints
+                    data.append(processed_data[:, begin:end])
+                    begin += window_size
+                    labels.append(trial[3])
+            return data, labels
+
+        elif self.task == 'pretrain_gestures':
+            data, labels = [], []
+            begin = trial[0]
+            window_size = int(self.sampling_rate * 0.2) # 0.2 seconds
+            # Long activity/rest in the task
+            for _ in range(50):
+                end = begin+totalpoints
+                data.append(processed_data[:, begin:end])
+                begin += window_size
+                labels.append(trial[3])
+            return data, labels
 
     def print_nr_trials(self):
         print('\nNumber of trials')
