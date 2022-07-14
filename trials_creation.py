@@ -24,7 +24,7 @@ class Trials_Creator():
 
         self.patient_data = patient_data
 
-        # Either 'phonemes', 'phonemes_noRest' or 'gestures' (5class, 4class, 4class)
+        # Either 'phonemes', 'phonemes_noRest', 'gestures' or 'small_gestures' (5class, 4class, 4class, 4class)
         self.task = task
         # Whether binary (rest vs. active) or multi-class classification
         self.restvsactive = restvsactive
@@ -58,6 +58,7 @@ class Trials_Creator():
         # INCORRECT: should add ECoG_data.shape[0] to first two columns of second task_data
         # might also want to incorporate possibility for even >2 files
         for i in range(1, len(task_path)):
+            print(f'Combining task data from multiple files...')
             task_file = h5py.File(task_path[i], 'r')
             new_taskdata = np.array(task_file['task_performance_data'], dtype=np.int32)
             task_file.close()
@@ -73,7 +74,6 @@ class Trials_Creator():
     def downsample_data(self, data, old_sampling_rate):
         # Take downsampling into account for COT and VOT
         for i in range(data.shape[1]):
-            # data[0, i] /= int(old_sampling_rate/self.sampling_rate)
             data[0, i] = int(data[0, i] / (old_sampling_rate/self.sampling_rate))
             if data[1, i] != 0 and data[1, i] != -1:
                 data[1, i] = int(data[1, i] / (old_sampling_rate/self.sampling_rate))
@@ -139,7 +139,7 @@ class Trials_Creator():
         print(f'Shape trials data: {data.shape}')
         return data, labels
 
-    def get_data(self, processed_data, trial, startpoint, endpoint, totalpoints):
+    def get_data(self, processed_data, trial, startpoint, endpoint, totalpoints, sliding_window=True):
         '''
         trial is vector consisting of [COT, VOT/MOT, _, label]
         
@@ -189,7 +189,7 @@ class Trials_Creator():
                 # Rest class: not wanted, return -1 and check for -1 in trialscreation
                 return -1, -1
         
-        elif self.task == 'gestures':
+        elif self.task == 'gestures' or self.task == 'small_gestures':
             # Include all trials
             if trial[3] in self.label_indices:
                 # Need to check this because with extracted features shape is [E x B x T]
@@ -203,32 +203,44 @@ class Trials_Creator():
             else: # Label index that is not wanted, return -1 and check for -1 in trialscreation
                 return -1, -1
 
-        elif self.task == 'pretrain_phonemes':
+        elif self.task == 'pretrain_phonemes' or self.task == 'pretrain_phonemes_noRest':
             data, labels = [], []
             begin = trial[0]
             window_size = int(self.sampling_rate * 0.2) # 0.2 seconds
             # Word pronounciation trials
             if self.patient_data.ID in ['1','7','8']:
-                for _ in range(5):
+                if sliding_window:
+                    n_multiplications = 5
+                else: 
+                    n_multiplications = 1
+                for _ in range(n_multiplications):
                     end = begin+totalpoints
                     data.append(processed_data[:, begin:end])
                     begin += window_size
                     labels.append(trial[3])
             # Long activity/rest in the task
             else:
-                for _ in range(50):
+                if sliding_window:
+                    n_multiplications = 50
+                else: 
+                    n_multiplications = 1
+                for _ in range(n_multiplications):
                     end = begin+totalpoints
                     data.append(processed_data[:, begin:end])
                     begin += window_size
                     labels.append(trial[3])
             return data, labels
 
-        elif self.task == 'pretrain_gestures':
+        elif self.task == 'pretrain_gestures' or self.task == 'pretrain_small_gestures':
             data, labels = [], []
             begin = trial[0]
             window_size = int(self.sampling_rate * 0.2) # 0.2 seconds
+            if sliding_window:
+                n_multiplications = 50
+            else:
+                n_multiplications = 1
             # Long activity/rest in the task
-            for _ in range(50):
+            for _ in range(n_multiplications):
                 end = begin+totalpoints
                 data.append(processed_data[:, begin:end])
                 begin += window_size
