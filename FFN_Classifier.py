@@ -69,10 +69,17 @@ class FFN_Classifier():
         dataloader = DataLoader(TensorDataset(X, y), shuffle=False, batch_size=self.batch_size)
         return dataloader, X, y
 
-    def train(self, dataloader, n_epochs=10, verbose=0):
+    def train(self, dataloader, test_index, intermediate_y_trues, intermediate_y_preds, n_epochs=10, verbose=0):
         # Initialize optimizer and loss function
         optimizer = self.optimizer(self.model.parameters())
         lossfunction = self.loss_fct()
+        # Log the test accuracy before training
+        self.model.eval()
+        _, X_test, y_test = self.create_dataloader(self.X[test_index:test_index+1], self.y[test_index:test_index+1])
+        y_pred = torch.argmax(self.model.forward(X_test), dim=1).item()
+        y_true = y_test.item()
+        intermediate_y_preds['epoch0'].append(y_pred)
+        intermediate_y_trues['epoch0'].append(y_true)
         # Start training for n_epochs
         for epoch in range(n_epochs):
             self.model.train()
@@ -86,6 +93,14 @@ class FFN_Classifier():
                 loss.backward()
                 optimizer.step()
                 epoch_loss += loss
+            # Log test accuracy every 5 epochs
+            if (epoch+1) % 5 == 0:
+                self.model.eval()
+                _, X_test, y_test = self.create_dataloader(self.X[test_index:test_index+1], self.y[test_index:test_index+1])
+                y_pred = torch.argmax(self.model.forward(X_test), dim=1).item()
+                y_true = y_test.item()
+                intermediate_y_preds[f'epoch{epoch+1}'].append(y_pred)
+                intermediate_y_trues[f'epoch{epoch+1}'].append(y_true)
             if verbose:
                 print(f'Loss (averaged over batches): {epoch_loss/len(dataloader)}')
                 # Training accuracy
@@ -96,6 +111,7 @@ class FFN_Classifier():
                 correct = torch.sum(y_pred == y_true)
                 acc = correct/self.y_train.shape[0]
                 print(f'Training accuracy: {acc}')
+        return intermediate_y_trues, intermediate_y_preds
             
 
     # TODO
@@ -115,6 +131,11 @@ class FFN_Classifier():
     def LOO_classification(self, plot_cm=True):
         y_preds, y_trues = [], []
         correct = 0
+        epochs = 25
+        # Create dictionaries to log test results every 5 epochs
+        intermediate_y_trues, intermediate_y_preds = dict(), dict()
+        for i in range(0, epochs+1, 5):
+            intermediate_y_trues[f'epoch{i}'], intermediate_y_preds[f'epoch{i}'] = [], []
     
         for i in tqdm(range(len(self.y))):
             # print(f'\nTrial {i+1}/{len(self.y)}...')
@@ -122,7 +143,7 @@ class FFN_Classifier():
             train_indices = [j for j in range(len(self.y)) if j != i]
             train_dataloader, self.X_train, self.y_train = self.create_dataloader(self.X[train_indices], self.y[train_indices])
             
-            self.train(train_dataloader, n_epochs=20)
+            intermediate_y_trues, intermediate_y_preds = self.train(train_dataloader, i, intermediate_y_trues, intermediate_y_preds, n_epochs=epochs)
 
             self.model.eval()
             _, X_test, y_test = self.create_dataloader(self.X[i:i+1], self.y[i:i+1])
@@ -139,4 +160,4 @@ class FFN_Classifier():
         if plot_cm:
             ConfusionMatrixDisplay.from_predictions(y_trues, y_preds, display_labels=self.labels)
             plt.show()
-        return accuracy, y_trues, y_preds
+        return accuracy, y_trues, y_preds, intermediate_y_trues, intermediate_y_preds

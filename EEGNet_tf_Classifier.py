@@ -1,4 +1,3 @@
-from tabnanny import verbose
 from tensorflow.keras.models import Model
 from tensorflow.keras.layers import Dense, Activation, Permute, Dropout
 from tensorflow.keras.layers import Conv2D, MaxPooling2D, AveragePooling2D
@@ -15,6 +14,7 @@ import tensorflow as tf
 
 import numpy as np
 import matplotlib.pyplot as plt
+from sklearn.metrics import accuracy_score
 from sklearn.metrics import ConfusionMatrixDisplay
 from tqdm import tqdm
 
@@ -111,8 +111,11 @@ class EEGNet_tf_Classifier():
         y_true = np.argmax(self.y[test_index])
         print(f'Predicted: {y_pred}, true: {y_true}')
 
-    def LOO_classification(self, plot_cm=True, pretrained_model=None, epochs=25):
+    def LOO_classification(self, plot_cm=True, pretrained_model=None, epochs=100, save_intermediate_results=True):
         y_preds, y_trues = [], []
+        intermediate_y_preds, intermediate_y_trues = dict(), dict()
+        for i in range(0,epochs+1,5):
+            intermediate_y_preds[f'epoch{i}'], intermediate_y_trues[f'epoch{i}'] = [], []
         correct = 0
         for i in tqdm(range(len(self.y))):
             if pretrained_model is None:
@@ -120,7 +123,21 @@ class EEGNet_tf_Classifier():
             else:
                 self.model = self.load_model(pretrained_model)
             train_indices = [j for j in range(len(self.y)) if j != i]
-            self.train(self.X[train_indices], self.y[train_indices], epochs=epochs)
+            if save_intermediate_results:
+                y_pred = np.argmax(self.single_prediction(self.X[i]))
+                y_true = np.argmax(self.y[i])    
+                intermediate_y_preds[f'epoch0'].append(y_pred)
+                intermediate_y_trues[f'epoch0'].append(y_true)
+                for j in range(0, epochs, 5):
+                    # Train for 5 epochs
+                    self.train(self.X[train_indices], self.y[train_indices], epochs=5)
+                    y_pred = np.argmax(self.single_prediction(self.X[i]))
+                    y_true = np.argmax(self.y[i])    
+                    intermediate_y_preds[f'epoch{j+5}'].append(y_pred)
+                    intermediate_y_trues[f'epoch{j+5}'].append(y_true)
+
+            else:
+                self.train(self.X[train_indices], self.y[train_indices], epochs=epochs)
             y_pred = np.argmax(self.single_prediction(self.X[i]))
             y_true = np.argmax(self.y[i])
             y_preds.append(y_pred)
@@ -135,11 +152,16 @@ class EEGNet_tf_Classifier():
         if plot_cm:
             ConfusionMatrixDisplay.from_predictions(y_trues, y_preds, display_labels=self.labels)
             plt.show()
-        return accuracy, y_trues, y_preds
+        for key in intermediate_y_preds:
+            print(f'{key}: {accuracy_score(intermediate_y_preds[key], intermediate_y_trues[key])}')
+        return accuracy, y_trues, y_preds, intermediate_y_trues, intermediate_y_preds
 
-    def finetune(self, model_savefile, make_plots):
-        acc, y_trues, y_preds = self.LOO_classification(pretrained_model=model_savefile, plot_cm=make_plots, epochs=25)
-        return acc, y_trues, y_preds     
+    def finetune(self, model_savefile, make_plots, save_intermediate_results):
+        acc, y_trues, y_preds, inter_y_trues, inter_y_preds = self.LOO_classification(pretrained_model=model_savefile, 
+                                                                                      plot_cm=make_plots, 
+                                                                                      epochs=100, 
+                                                                                      save_intermediate_results=save_intermediate_results)
+        return acc, y_trues, y_preds, inter_y_trues, inter_y_preds
 
     def pretrain(self, model_path, batch_size=5, epochs=25, verbose=0):
         self.model = self.initialize_model()
@@ -155,12 +177,36 @@ class EEGNet_tf_Classifier():
     def load_model(self, model_path):
         # Load pretrained model from model_file
         pretrained_model = tf.keras.models.load_model(model_path)
-        # Use all layers except last 3 (Dense/kernelconstraint/softmax)
+
+        '''
+        # Freeze first two layers
+        pretrained_model.layers[1].trainable = False # Conv2D layer
+        pretrained_model.layers[3].trainable = False # DepthwiseConv2D
+
+        # Take output of first 2 blocks
+        x = pretrained_model.layers[7].output
+
+        # Create new third block and classification layer
+        block2       = SeparableConv2D(self.F2, (1, 16),
+                                       use_bias = False, padding = 'same')(x)
+        block2       = BatchNormalization(name='bnorm2')(block2)
+        block2       = Activation('elu', name='act2')(block2)
+        block2       = AveragePooling2D((1, 8), name='pooling2')(block2)
+        block2       = Dropout(self.dropoutRate, name='dropout2')(block2)
+    
+        flatten      = Flatten()(block2)
+        dense        = Dense(self.n_classes, kernel_constraint = max_norm(self.norm_rate))(flatten)
+        softmax      = Activation('softmax', name = 'softmax')(dense)
+        '''
+        
+        # Take output of Flatten layer (i.e. after third block/before classification)
         x = pretrained_model.layers[-3].output
-        # Define new last layers
+        # Define new classification layer
         x = Dense(self.n_classes, name='dense', kernel_constraint=max_norm(self.norm_rate))(x)
         softmax = Activation('softmax', name='softmax')(x)
+        
         # Construct and compile new model
         model = Model(inputs=pretrained_model.input, outputs=softmax)
         model.compile(loss='categorical_crossentropy', optimizer='adam', metrics=['accuracy'])
+        # print(model.summary())
         return model
