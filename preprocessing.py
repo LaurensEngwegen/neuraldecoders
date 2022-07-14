@@ -142,7 +142,7 @@ class Preprocessor():
         print(f'Notch filtering...')
         freqs = np.array([50, 100])
         data = notch_filter(x=data, Fs=self.sampling_rate, freqs=freqs, verbose=True)
-        if self.patient_data.ID == '7.2':
+        if self.patient_data.ID == '7':
             data = filter_data(data=data, sfreq=self.sampling_rate, l_freq=150, h_freq=110, l_trans_bandwidth=0.5, h_trans_bandwidth=0.5, verbose=True)
         return data
 
@@ -169,18 +169,15 @@ class Preprocessor():
             'theta': np.arange(4,9),
             'alpha': np.arange(8,13),
             'beta': np.arange(13,31),
-            # 'lowgamma': np.arange(30,71),
-            # 'highgamma': np.arange(70,151),
             'gamma': np.arange(40,151), # Previously called 'broadband40-150'
-            'gestures_gamma': np.arange(70,126),
-            'gestures_gamma_2': np.arange(70,126)
+            'gestures_gamma': np.arange(70,126), # gamma band for gestures task (used in paper)
         }
-        if self.patient_data.ID == '7.2':
+        if self.patient_data.ID == '7':
             freq_bands['gamma'] = np.arange(40,111)
 
         if self.preprocessing_type == 'allbands':
             freqs = [freq_bands['delta'], freq_bands['theta'], freq_bands['alpha'], freq_bands['beta'], freq_bands['gamma']]
-        elif self.preprocessing_type == 'articleHFB':
+        elif self.preprocessing_type == 'articleHFB': # gamma band used in phonemes paper
             freqs = [np.arange(65,126)]
         else:
             freqs = [freq_bands[self.preprocessing_type]]
