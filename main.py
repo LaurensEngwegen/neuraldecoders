@@ -1,50 +1,86 @@
-from cProfile import label
-from site import makepath
 from utils import *
+from plots import *
+
+def create_plots():
+    pretrain_model = 'model_100epochs' # define for new_clf_plot to include finetuned EEGNet
+
+    IDs = ['1','2','3','4','5','6','7','8']
+    task = 'phonemes_noRest'
+    # IDs = ['9','10','11','12','13']
+    # task = 'small_gestures'
+
+    # classifier = 'STMF'
+    # p_type = ['delta', 'theta', 'alpha', 'beta', 'gamma', 'allbands']
+    # plot_features_results(classifier, p_type, IDs, task=task, restvsactive=False, save_fig=True, anonymized=True)
+
+    # classifier = 'kNN'
+    # p_type = 'gamma'
+    # plot_clf_optimization(classifier, p_type, IDs, task=task, save_fig=True, anonymized=True)
+    # classifier = 'FFN'
+    # p_type = 'gamma'
+    # plot_clf_optimization(classifier, p_type, IDs, task=task, save_fig=True, anonymized=True)
+    # classifier = 'FFN'
+    # p_type = 'CAR'
+    # plot_clf_optimization(classifier, p_type, IDs, task=task, save_fig=True, anonymized=True)
+
+    # plot_classifier_results(task, pretrain_model=pretrain_model, save_fig=False, anonymized=True)
+
+    tasks = ['finetuned_phonemes_noRest', 'finetuned_small_gestures']
+    for task in tasks:
+        model = 'EEGNet'
+        # plot_learning_curve(task, model, pretrain_model=pretrain_model, save_fig=True, anonymized=True)
+
+    # write_all_accuracies()
+    # do_paired_ttest()
+
+    task = 'phonemes_noRest'
+    # classifiers = ['EEGNet', 'EEGNet finetuned']
+    classifiers = None
+    # new_clf_plot(task, classifiers, pretrain_model=None, barplot=False, save_fig=True, anonymized=True)
+
 
 if __name__ == '__main__':
     # Sampling rate of signal
     sampling_rate = 512
     # Number of samples at beginning and end of file that should be excluded
     buffer = 64
-    # Which task (phonemes, phonemes_noRest, or gestures)
-    # For finetuning: need to set task to either phonemes_noRest or gestures!
-    # task = 'phonemes_noRest'
+    # Which task ('phonemes' (5-class), 'phonemes_noRest', 'gestures', s'mall_gestures')
+    # For pretraining: 'pretrain_phonemes' or 'pretrain_gestures'
     task = 'phonemes_noRest'
     # Patient data to use
-    patient_IDs = ['1','2','3','4','5','6','7','8']
-    # patient_IDs = ['9','10','11','12','13']
-    # patient_IDs = ['2','3']
-    # patient_IDs = ['7.2']
+    patient_IDs = ['1','2','3','4','5','6','7','8'] # Phonemes
+    # patient_IDs = ['9','10','11','12','13'] # Gestures
     # Type of preprocessing/features to extract
     # preprocessing_types = ['delta', 'theta', 'alpha', 'beta', 'gamma', 'allbands']
-    # preprocessing_types = ['gestures_gamma', 'gamma']
     preprocessing_types = ['CAR']
-    # Define which classifiers to experiment with: 'STMF' / 'SVM' / 'kNN' / ('RF') / 'FFN' / 'EEGNet' / 'LSTM'
-    # classifiers = ['FFN256-128','FFN128-64','FFN64-32','FFN32-16']
-    # classifiers = ['FFN32-16']
-    # classifiers = ['kNN3','kNN5','kNN7','kNN9','kNN11','kNN13','kNN15','kNN17','kNN19', 'STMF', 'SVM']
-    # classifiers = ['LSTM32', 'LSTM64', 'LSTM128', 'LSTM256']
+    # Define which classifiers to experiment with: 'STMF' / 'SVM' / 'kNN' / 'FFN' / 'EEGNet' (/ 'LSTM')
+    # kNN and FFN need extra information:
+    # - kNN: value for k in (1,3,...,19), e.g. ['kNN11']
+    # - FFN: number of nodes in hidden layers from (256-128, 128-64, 64-32, 32-16)
     classifiers = ['EEGNet']
-    # classifiers = ['STMF', 'SVM']
     #  Number of experiments to average accuracy over 
     # (only useful for non-deterministic classifiers)
     n_experiments = 5
-    
+
     # Which functionalities to execute (True/False)
     preprocess = False
     create_trials = False
     classify = False
-    make_plots = False # Mean freq band and confusion matrix
+    make_plots = False # Plot mean freq band and confusion matrix
     save_results = True
     plot_results = False
     # Either binary (rest vs. active) or multi-class classification
     restvsactive = False
 
     # Transfer learning
-    pretrain = False
+    pretrain = False # Set batch_size and epochs in function call below
     finetune = True
-    model_name = 'third_model'
+    model_name = 'first_model'
+
+    # First model = Minimal number of rest vs. active trials + batch_size=5 + epochs=25
+    # Second model = Extended number of rest vs. active trials + batch_size=5 + epochs=25
+    # Third model = Extended number of rest vs. active trials + batch_size=32 + epochs=25
+    # Fourth model = thirdmodel with epochs=8 / .....
 
     pca = False
 
@@ -52,6 +88,8 @@ if __name__ == '__main__':
         'phonemes': {'labels': ['/p/', '/oe/', '/a/', '/k/', 'Rest'], 'windowstart': -0.5, 'windowstop': 0.5},
         'phonemes_noRest': {'labels': ['/p/', '/oe/', '/a/', '/k/'], 'windowstart': -0.5, 'windowstop': 0.5},
         'pretrain_phonemes': {'labels': ['Rest', 'Active'], 'windowstart': -0.5, 'windowstop': 0.5},
+        'small_gestures': {'labels': ['G1', 'G2', 'G3', 'G4'], 'windowstart': -0.5, 'windowstop': 0.5},
+        'pretrain_small_gestures': {'labels': ['Rest', 'Active'], 'windowstart': -0.5, 'windowstop': 0.5},
         'gestures': {'labels': ['G1', 'G2', 'G3', 'G4'], 'windowstart': -1.0, 'windowstop': 2.6},
         'pretrain_gestures': {'labels': ['Rest', 'Active'], 'windowstart': -1.0, 'windowstop': 2.6}
     }
@@ -87,6 +125,7 @@ if __name__ == '__main__':
                                     task=task)
     
     if classify:
+        print(f'\nClassification of \'{task}\'...\n')
         results = classification_loop(patient_IDs, 
                                          preprocessing_types,
                                          classifiers,
@@ -98,6 +137,7 @@ if __name__ == '__main__':
                                          task_info[task]['windowstop'],
                                          make_plots,
                                          save_results,
+                                         save_intermediate_results=True,
                                          LOO=True,
                                          task=task)
         print_results(results, n_experiments)
@@ -110,7 +150,8 @@ if __name__ == '__main__':
                     trial_window_start=task_info[task]['windowstart'],
                     trial_window_stop=task_info[task]['windowstop'],
                     model_name=model_name,
-                    batch_size=32,
+                    batch_size=5,
+                    epochs=100,
                     verbose=1)
     
     if finetune:
@@ -123,13 +164,12 @@ if __name__ == '__main__':
                                 trial_window_stop=task_info[task]['windowstop'],
                                 model_name=model_name,
                                 save_results=save_results,
+                                save_intermediate_results=True,
                                 make_plots=make_plots)
         # print_results(results, n_experiments) error cause not [classifier][ptype][patient] but just [patient]
 
     if plot_results:
-        # plot_features_results(classifiers, preprocessing_types, patient_IDs, restvsactive, task=task)
-        # plot_clf_optimization(['kNN', 'FFN'], 'gamma', patient_IDs, restvsactive, task=task)
-        plot_classifier_results(patient_IDs, task=task)
+        create_plots()
 
     if pca:
         for pID in patient_IDs:
@@ -137,6 +177,10 @@ if __name__ == '__main__':
             for ptype in preprocessing_types:
                 trials_path = f'data/{task}/{patient_data.patient}/{patient_data.patient}_{ptype}{classification_type}_trials.pkl'
                 pca_visualization(trials_path)
+
+    # small_gestures currently running:
+        # all features: STMF, SVM
+        # CAR: all FFNs, EEGNet
 
     # TODO:
     # V Add print info (nr. of experiments) when creating plots
