@@ -17,8 +17,6 @@ from sklearn.metrics import accuracy_score
 import pickle as pkl
 import matplotlib.pyplot as plt
 
-# Increase font size in plots
-plt.rcParams.update({'font.size': 16})
 
 # Function to preprocess data and create trials
 def preprocessing(patient_data,
@@ -34,12 +32,12 @@ def preprocessing(patient_data,
         if task == 'phonemes' or task == 'phonemes_noRest':
             for i in range(patient_data.n_files):
                 data_filenames.append(f'data/phonemes/{patient_data.patient}/{patient_data.patient}_RawData_{i+1}.mat')
-        elif task == 'gestures':
+        elif task == 'gestures' or task == 'small_gestures':
             for i in range(patient_data.n_files):
                 data_filenames.append(f'data/gestures/{patient_data.patient}/{patient_data.patient}_run_{i+1}.mat')
         elif task == 'pretrain_phonemes':
             data_filenames.append(f'data/pretrain_phonemes/{patient_data.patient}/4P_{patient_data.patient}.mat')
-        elif task == 'pretrain_gestures':
+        elif task == 'pretrain_gestures' or task == 'pretrain_small_gestures':
             data_filenames.append(f'data/pretrain_gestures/{patient_data.patient}/4G_{patient_data.patient}.mat')
 
     preprocessor = Preprocessor(data_filenames,
@@ -62,13 +60,13 @@ def trials_creation(patient_data,
                     task='phonemes'):
         if task == 'phonemes' or task == 'phonemes_noRest':
             task_path = [f'data/phonemes/{patient_data.patient}/{patient_data.patient}_NEW_trial_markers.mat']
-        elif task == 'gestures':
+        elif task == 'gestures' or task == 'small_gestures':
             task_path = []
             for i in range(patient_data.n_files):
-                task_path.append(f'data/{task}/{patient_data.patient}/{patient_data.patient}_run_{i+1}.mat')
+                task_path.append(f'data/gestures/{patient_data.patient}/{patient_data.patient}_run_{i+1}.mat')
         elif task == 'pretrain_phonemes':
             task_path = [f'data/pretrain_phonemes/{patient_data.patient}/4P_{patient_data.patient}.mat']
-        elif task == 'pretrain_gestures':
+        elif task == 'pretrain_gestures' or task == 'pretrain_small_gestures':
             task_path = [f'data/pretrain_gestures/{patient_data.patient}/4G_{patient_data.patient}.mat']
         # Set save_path to None to not save/overwrite trials
         Trials_Creator(task_path = task_path, 
@@ -103,6 +101,9 @@ def classification(classifier,
                    LOO=False,
                    make_plots=False, 
                    test_index=None):
+    # Intermediate results during training of neural networks    
+    intermediate_y_true, intermediate_y_pred = None, None
+
     # Classification with STMF
     if classifier == 'STMF':
         stmf_cls = STMF_Classifier(X, y, labelsdict, trial_window_start, trial_window_stop)
@@ -151,7 +152,7 @@ def classification(classifier,
             ffn.single_classification(test_index)
             accuracy, y_true, y_pred = -1, -1, -1
         if LOO:
-            accuracy, y_true, y_pred = ffn.LOO_classification(make_plots)
+            accuracy, y_true, y_pred, intermediate_y_true, intermediate_y_pred = ffn.LOO_classification(make_plots)
 
     # Classification with EEGNet in TensorFlow
     elif classifier in ['EEGNet', 'EEGNet4-2', 'EEGNet16-2']:
@@ -182,29 +183,9 @@ def classification(classifier,
             eegnet_tf.single_classification(test_index)
             accuracy, y_true, y_pred = -1, -1, -1
         if LOO:
-            accuracy, y_true, y_pred = eegnet_tf.LOO_classification(make_plots)
+            accuracy, y_true, y_pred, intermediate_y_true, intermediate_y_pred = eegnet_tf.LOO_classification(make_plots)
 
-    # Classification with EEGNet in PyTorch
-    elif classifier == 'EEGNet_torch':
-        # Hyperparameters of EEGNet
-        eegnet_kwargs = {
-            'n_samples': int((trial_window_stop-trial_window_start) * sampling_rate),
-            'dropoutRate': 0.5,
-            'kernLength': int(sampling_rate/2),
-            'F1': 8,
-            'D': 2, 
-            'F2': 16,
-            'norm1': 1.0,
-            'norm2': 0.25
-        }
-        eegnet = EEGNet_torch_Classifier(X, y, labelsdict, n_channels=X.shape[1], **eegnet_kwargs)
-        if test_index is not None:
-            eegnet.single_classification(test_index)
-            accuracy, y_true, y_pred = -1, -1, -1
-        if LOO:
-            accuracy, y_true, y_pred = eegnet.LOO_classification(make_plots)
-
-    # Classification wit (stacked) LSTM
+    # Classification with (stacked) LSTM
     elif classifier in ['LSTM256', 'LSTM128', 'LSTM64', 'LSTM32', 'LSTM16']:
         if classifier == 'LSTM256':
             n_hidden = 256
@@ -230,9 +211,9 @@ def classification(classifier,
             lstm.single_classification(test_index)
             accuracy, y_true, y_pred = -1, -1, -1
         if LOO:
-            accuracy, y_true, y_pred = lstm.LOO_classification(make_plots)
+            accuracy, y_true, y_pred, _, _ = lstm.LOO_classification(make_plots)
     
-    return accuracy, y_true, y_pred
+    return accuracy, y_true, y_pred, intermediate_y_true, intermediate_y_pred
 
 def classification_loop(patient_IDs,
                         preprocessing_types,
@@ -245,17 +226,21 @@ def classification_loop(patient_IDs,
                         trial_window_stop,
                         make_plots,
                         save_results,
+                        save_intermediate_results,
                         LOO=True,
                         test_index=None,
                         task='phonemes'):
     # Create dict to store accuracies 
     # (in lists for possibility to average over multiple experiments)
     results = dict()
+    intermediate_results = dict()
     # Start classification loop
     for classifier in classifiers:
         results[classifier] = dict()
+        intermediate_results[classifier] = dict()
         for preprocessing_type in preprocessing_types:
             results[classifier][preprocessing_type] = dict()
+            intermediate_results[classifier][preprocessing_type] = dict()
             for pID in patient_IDs:
                 patient_data = PatientDataMapper(pID, task)
                 # Path where trials are stored
@@ -265,21 +250,24 @@ def classification_loop(patient_IDs,
                 # Load (preprocessed) trials for specific patient
                 X, y = load_trials(trials_path)
                 results[classifier][preprocessing_type][patient_data.patient] = {'y_true': [], 'y_pred': []}
+                intermediate_results[classifier][preprocessing_type][patient_data.patient] = {'y_true': [], 'y_pred': []}
                 for i in range(n_experiments):
                     print(f'\nRepetition {i+1} using \'{preprocessing_type}\' trials from patient \'{patient_data.patient}\' ({X.shape[1]} channels, {X.shape[0]} trials)')
                     print(f'Classification with {classifier}...')
-                    accuracy, y_true, y_pred = classification(classifier,
-                                                              X, 
-                                                              y, 
-                                                              labelsdict, 
-                                                              sampling_rate,
-                                                              trial_window_start,
-                                                              trial_window_stop, 
-                                                              make_plots=make_plots, 
-                                                              LOO=LOO,
-                                                              test_index=test_index)
+                    accuracy, y_true, y_pred, intermediate_y_true, intermediate_y_pred = classification(classifier,
+                                                                                                        X, 
+                                                                                                        y, 
+                                                                                                        labelsdict, 
+                                                                                                        sampling_rate,
+                                                                                                        trial_window_start,
+                                                                                                        trial_window_stop, 
+                                                                                                        make_plots=make_plots, 
+                                                                                                        LOO=LOO,
+                                                                                                        test_index=test_index)
                     results[classifier][preprocessing_type][patient_data.patient]['y_true'].append(y_true)
                     results[classifier][preprocessing_type][patient_data.patient]['y_pred'].append(y_pred)
+                    intermediate_results[classifier][preprocessing_type][patient_data.patient]['y_true'].append(intermediate_y_true)
+                    intermediate_results[classifier][preprocessing_type][patient_data.patient]['y_pred'].append(intermediate_y_pred)
                 if save_results:
                     directory = f'results/{task}/{classifier}/{preprocessing_type}{classification_type}'
                     if not os.path.exists(directory):
@@ -288,6 +276,11 @@ def classification_loop(patient_IDs,
                     with open(file, 'wb+') as f:
                         pkl.dump(results[classifier][preprocessing_type][patient_data.patient], f)
                     print(f'Results stored in \'{file}\'')
+                    if save_intermediate_results:
+                        # Store 'intermediate_results', i.e. results after each 5 epochs
+                        file = f'{directory}/{patient_data.trials_fileID}_results_learningcurve.pkl'
+                        with open(file, 'wb+') as f:
+                            pkl.dump(intermediate_results, f)
     return results
 
 
@@ -334,6 +327,7 @@ def finetuneEEGNet(patient_IDs,
                     trial_window_stop,
                     model_name,
                     save_results,
+                    save_intermediate_results,
                     make_plots):
     # Hyperparameters of EEGNet
     eegnet_kwargs = {
@@ -347,15 +341,19 @@ def finetuneEEGNet(patient_IDs,
         'F2': 16
         }
     results = dict()
+    intermediate_results = dict()
     for pID in patient_IDs:
         patient_data = PatientDataMapper(pID, task)
         results[patient_data.patient] = {'y_true': [], 'y_pred': []}
+        intermediate_results = {'y_true': [], 'y_pred': []}
         # Path where trials are stored
         trials_path = f'data/{task}/{patient_data.trials_fileID}/{patient_data.trials_fileID}_CAR_trials.pkl'
         # Path in which pretrained model is stored
         if task == 'gestures':
             model_path = f'models/pretrain_gestures/{patient_data.trials_fileID}/{model_name}'
-        else:
+        elif task == 'small_gestures':
+            model_path = f'models/pretrain_small_gestures/{patient_data.trials_fileID}/{model_name}'
+        elif task == 'phonemes' or 'phonemes_noRest':
             model_path = f'models/pretrain_phonemes/{patient_data.trials_fileID}/{model_name}'
         # Define mapping from indices to labels (differs per patient)
         labelsdict = {patient_data.label_indices[i]: labels[i] for i in range(len(labels))}
@@ -364,18 +362,25 @@ def finetuneEEGNet(patient_IDs,
         for i in range(n_experiments):
             print(f'\nRepetition {i+1} finetuning \'{model_name}\' on \'{task}\' for patient \'{patient_data.patient}\' ({X.shape[1]} channels, {X.shape[0]} trials)')
             eegnet = EEGNet_tf_Classifier(X, y, labelsdict, n_channels=X.shape[1], **eegnet_kwargs)
-            acc, y_true, y_pred = eegnet.finetune(model_path, make_plots)
+            acc, y_true, y_pred, intermediate_y_trues, intermediate_y_preds = eegnet.finetune(model_path, make_plots, save_intermediate_results=save_intermediate_results)
             results[patient_data.patient]['y_true'].append(y_true)
             results[patient_data.patient]['y_pred'].append(y_pred)
-        
+            intermediate_results['y_true'].append(intermediate_y_trues)
+            intermediate_results['y_pred'].append(intermediate_y_preds)
+
         if save_results:
-            directory = f'results/finetuned_{task}'
+            directory = f'results/finetuned_{task}/{model_name}'
             if not os.path.exists(directory):
                 os.makedirs(directory)
             file = f'{directory}/{patient_data.trials_fileID}_results.pkl'
             with open(file, 'wb+') as f:
                 pkl.dump(results[patient_data.patient], f)
             print(f'Results stored in \'{file}\'')
+            if save_intermediate_results:
+                # Store 'intermediate_results', i.e. results after each 5 epochs
+                file = f'{directory}/{patient_data.trials_fileID}_results_learningcurve.pkl'
+                with open(file, 'wb+') as f:
+                    pkl.dump(intermediate_results, f)
     return results
             
 
@@ -423,206 +428,3 @@ def get_accuracy(file):
         accs = np.array(accs)
         return np.mean(accs), np.std(accs)
 
-
-
-def plot_features_results(classifiers, preprocessing_types, patient_IDs, restvsactive=False, task='phonemes'):
-    if restvsactive:
-        preprocessing_types = [ptype+'_RvA' for ptype in preprocessing_types]
-    # Define plot variables
-    patient_labels = []
-    for patient_ID in patient_IDs:
-        patient_labels.append(PatientDataMapper(patient_ID, task).patient)
-    x_axis = np.arange(len(patient_IDs))
-    n_params = len(preprocessing_types) + 1
-    width = 0.1
-    # pos = [-.25, -.15, -.05, .05, .15, .25]
-    # pos = [-.3, -.2, -.1, 0, .1, .2, .35]
-    pos = []
-        # Make 'pos' a list of len=n_params with values around 0
-    if n_params % 2 == 0: # even number of params
-        for i in np.arange(-0.5*width-((n_params-2)/2)*width, 0, width):
-            pos.append(round(i,2))
-        for i in np.arange(0.5*width, 0.5*width+((n_params-1)/2)*width, width):
-            pos.append(round(i,2))
-    else: # odd number of params
-        for i in np.arange(0-((n_params-1)/2)*width, 0, width):
-            pos.append(round(i,2))
-        for i in np.arange(0, ((n_params+1)/2)*width, width):
-            pos.append(round(i,2))
-
-    # Read all result data
-    for classifier in classifiers:
-        all_data = []
-        for preprocessing_type in preprocessing_types:
-            data = []
-            directory = f'results/{task}/{classifier}/{preprocessing_type}'
-            for patient_ID in patient_IDs:
-                patient_data = PatientDataMapper(patient_ID, task)
-                file = f'{directory}/{patient_data.trials_fileID}_results.pkl'
-                acc, _ = get_accuracy(file)
-                data.append(acc)
-            all_data.append(data) # Patients x Preprocessing_types
-        # Barplot
-        plt.figure(figsize=(12,8))
-        for i, data in enumerate(all_data):
-            if restvsactive:
-                plt.bar(x_axis + pos[i], data, width=width, label=preprocessing_types[i][:-4])
-            else:
-                plt.bar(x_axis + pos[i], data, width=width, label=preprocessing_types[i])
-        plot_article_acc(x_axis, pos[len(pos)-1], width, restvsactive, task)
-        if task == 'phonemes':
-            if restvsactive:
-                title = f'Accuracy of {classifier} on active vs. rest'
-            else:
-                title = f'Accuracy of {classifier} on 5-class phonemes'
-        elif task == 'phonemes_noRest':
-            title = f'Accuracy of {classifier} on 4-class phonemes'
-        else: # gestures
-            title = f'Accuracy of {classifier} on 4-class gestures'
-        plt.title(title)
-        plt.xticks(x_axis, patient_labels)
-        plt.yticks(np.arange(0,1.01,0.1))
-        plt.legend(loc = 6, bbox_to_anchor = (1, 0.5))
-        plt.grid(alpha=0.35)
-        plt.tight_layout()
-        plt.show()
-
-def plot_clf_optimization(classifiers, preprocessing_type, patient_IDs, restvsactive=False, task='phonemes'):
-    for classifier in classifiers:
-        # k's tested for kNN
-        if classifier == 'kNN':
-            params = ['3','5','7','9','11','13','15','17','19']
-            labelprefix = '$k$ = '
-        # Architectures tested for FFN
-        elif classifier == 'FFN':
-            params = ['256-128','128-64','64-32','32-16']
-            labelprefix = 'FFN'
-        n_params = len(params)
-        tested_classifiers = []
-        for param in params:
-            tested_classifiers.append(f'{classifier}{param}')
-
-        if restvsactive:
-            preprocessing_type = f'{preprocessing_type}_RvA'
-        # Define plot variables
-        patient_labels = []
-        for patient_ID in patient_IDs:
-            patient_labels.append(PatientDataMapper(patient_ID, task).patient)
-        x_axis = np.arange(len(patient_IDs))
-        width = 0.08
-        pos = []
-        # Make 'pos' a list of len=n_params with values around 0
-        if n_params % 2 == 0: # even number of params
-            for i in np.arange(-0.5*width-((n_params-2)/2)*width, 0, width):
-                pos.append(round(i,2))
-            for i in np.arange(0.5*width, 0.5*width+((n_params-1)/2)*width, width):
-                pos.append(round(i,2))
-        else: # odd number of params
-            for i in np.arange(0-((n_params-1)/2)*width, 0, width):
-                pos.append(round(i,2))
-            for i in np.arange(0, ((n_params+1)/2)*width, width):
-                pos.append(round(i,2))
-        
-        # Read all result data
-        all_data = []
-        for tested_clf in tested_classifiers:
-            data = []
-            directory = f'results/{task}/{tested_clf}/{preprocessing_type}'
-            for patient_ID in patient_IDs:
-                patient_data = PatientDataMapper(patient_ID, task)
-                file = f'{directory}/{patient_data.trials_fileID}_results.pkl'
-                acc, _ = get_accuracy(file)
-                data.append(acc)
-            all_data.append(data) # Patients x Preprocessing_types
-        # Barplot
-        plt.figure(figsize=(12,8))
-        for i, data in enumerate(all_data):
-            plt.bar(x_axis + pos[i], data, width=width, label=f'{labelprefix}{params[i]}')
-        if task == 'phonemes':
-            if restvsactive:
-                title = f'Accuracy of {classifier} on active vs. rest'
-            else:
-                title = f'Accuracy of {classifier} on 5-class phonemes'
-        elif task == 'phonemes_noRest':
-            title = f'Accuracy of {classifier} on 4-class phonemes'
-        else: # gestures
-            title = f'Accuracy of {classifier} on 4-class gestures'
-        plt.title(title)
-        plt.xticks(x_axis, patient_labels)
-        plt.yticks(np.arange(0,1.01,0.1))
-        plt.legend(loc = 6, bbox_to_anchor = (1, 0.5))
-        plt.grid(alpha=0.35)
-        plt.tight_layout()
-        plt.show()
-    
-def plot_classifier_results(patient_IDs, task='phonemes'):
-    result_info = {
-        'STMF': {'ptype': 'gamma', 'title': 'STMF'},
-        'SVM': {'ptype': 'gamma', 'title': 'SVM'},
-    }
-    if task == 'phonemes':
-        result_info['kNN11'] = {'ptype': 'gamma', 'title': 'kNN (k=11)'}
-        result_info['FFN128-64'] = {'ptype': 'gamma', 'title': 'FFN (gamma band)'}
-        title = f'Accuracy of different classifiers on 5-class phoneme classification'
-    elif task == 'phonemes_noRest':
-        result_info['kNN11'] = {'ptype': 'gamma', 'title': 'kNN (k=11)'}
-        result_info['FFN128-64'] = {'ptype': 'gamma', 'title': 'FFN (gamma band)'}
-        title = f'Accuracy of different classifiers on 4-class phoneme classification'
-    else: # gestures
-        result_info['kNN3'] = {'ptype': 'gamma', 'title': 'kNN (k=3)'}
-        result_info['FFN64-32'] = {'ptype': 'gamma', 'title': 'FFN (gamma band)'}
-        title = f'Accuracy of different classifiers on 4-class gesture classification'
-    
-    result_info['EEGNet'] = {'ptype': 'CAR', 'title': 'EEGNet'}
-    result_info['EEGNet finetuned'] = {'ptype': 'CAR', 'title': 'EEGNet finetuned'}
-    
-    patient_labels = []
-    for patient_ID in patient_IDs:
-        patient_labels.append(PatientDataMapper(patient_ID, task).patient)
-    x_axis = np.arange(len(patient_IDs))
-    # pos = [-0.25, -0.15, -0.05, 0.05, 0.15, 0.25]
-    pos = [-0.2, -0.1, 0, 0.1, 0.2, 0.3]
-    width = 0.1
-
-    all_accs, all_stds, titles = [], [], []
-    for classifier in result_info:
-        accs, stds = [], []
-        preprocessing_type = result_info[classifier]['ptype']
-        if classifier == 'EEGNet finetuned':
-            directory = f'results/finetuned_{task}'
-        else:
-            directory = f'results/{task}/{classifier}/{preprocessing_type}'
-        for patient in patient_labels:
-            file = f'{directory}/{patient}_results.pkl'
-            acc, std = get_accuracy(file)
-            accs.append(acc)
-            stds.append(std)
-            # with open(f'results/accuracies/{task}/accuracies.txt', 'a') as f:
-            #     f.write(f'{classifier}\t{patient}\t{acc}\n')
-        all_accs.append(accs)
-        all_stds.append(stds)
-        titles.append(result_info[classifier]['title'])
-
-    plt.figure(figsize=(12,8))
-    # Add entry to 'pos' to plot article acc.
-    plot_article_acc(x_axis, -0.35, width, task=task)
-    for i, accuracies in enumerate(all_accs):
-        plt.bar(x_axis+pos[i], accuracies, yerr=all_stds[i], width=width, label=titles[i])
-    plt.title(title)
-    plt.xticks(x_axis, patient_labels)
-    plt.yticks(np.arange(0,1.01,0.1))
-    plt.legend(loc = 6, bbox_to_anchor = (1, 0.5))
-    plt.grid(alpha=0.35)
-    plt.tight_layout()
-    plt.show()
-
-# TODO: add patient 4 acc (0.685) when data i
-def plot_article_acc(x_axis, pos, width, restvsactive=False, task='phonemes'):
-    if task == 'phonemes':
-        article_accuracies = [0.814, 0.704, 0.831, 0.685, 0.741, 0, 0, 0]
-        if restvsactive:
-            article_accuracies = [0.831, 1, 1, 0.9, 0.667, 0, 0, 0]
-        label = 'Article STMF'
-    else:
-        return
-    plt.bar(x_axis+pos, article_accuracies, width=width, label=label, color='lightgrey')
