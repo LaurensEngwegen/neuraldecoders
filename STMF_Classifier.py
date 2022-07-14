@@ -16,11 +16,11 @@ class STMF_Classifier():
         self.time_window_start = time_window_start
         self.time_window_stop = time_window_stop
         self.n_electrodes = self.X.shape[1]
+        self.n_labels = len(np.unique(y))
         
     def train(self, X_train, y_train):
         mean_HFB_perclass = dict()
-        unique_labels = np.unique(y_train)
-        for label in unique_labels:
+        for label in np.unique(y_train):
             signal = X_train[y_train==label]
             mean_HFB_perclass[label] = np.mean(signal, 0)
         self.mean_HFB_perclass = mean_HFB_perclass
@@ -78,7 +78,7 @@ class STMF_Classifier():
         print(f'Predicted: {y_pred}, true: {y_true}')
         self.plot_HFB_perclass(self.mean_HFB_perclass)
 
-    def plot_HFB_perclass(self, HFB_perclass, zscore=False):
+    def plot_HFB_perclass(self, HFB_perclass, zscore=True):
         # Check if it possible to plot (i.e. only one averaged frequency band)
         for label, hfb in HFB_perclass.items():
             if hfb.shape[1] == 1:
@@ -91,18 +91,17 @@ class STMF_Classifier():
                 for i, electrode in enumerate(hfb):
                     hfb[i] = (electrode - np.mean(electrode)) / np.std(electrode)
         # Plot Z-scored HFBs
-        fig, ax = plt.subplots(1, 5, figsize=(16,4))
+        fig, ax = plt.subplots(1, self.n_labels, figsize=(16,4))
         plt.suptitle('Mean gamma band per class')
         for i, label in enumerate(HFB_perclass):
-            ax[i].matshow(HFB_perclass[label], aspect='auto', cmap='jet')
+            ax[i].matshow(HFB_perclass[label], aspect='auto')#, cmap='jet')
             ax[i].set_title(f'{self.id2label[label]}')
-            # Set correct x-ticks (here: -0.5, 0, 0.5 with 0=VOT)
             start, end = ax[i].get_xlim()
             ax[i].xaxis.set_ticks((start, start+((end-start)/2), end), (self.time_window_start,0,self.time_window_stop))
             ax[i].xaxis.set_ticks_position('bottom')
             # Set correct y-ticks (electrodes)
             ax[i].yaxis.set_ticks([i for i in range(9,self.n_electrodes,10)], [i for i in range(10,self.n_electrodes+1,10)])
-        ax[2].set_xlabel('Time in seconds (0 at VOT)')
+        ax[2].set_xlabel('Time in seconds (0 at VOT)') # Change to MOT for gestures
         ax[0].set_ylabel('Electrodes')
         fig.tight_layout()
         plt.show()
