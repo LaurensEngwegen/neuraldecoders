@@ -1,5 +1,8 @@
 # Folders with sensitive data
 patient_data_mapping.py
+LSTM_Classifier.py
+LSTM_Classifier_tf.py
+EEGNet_torch_Classifier.py
 data/
 models/
 results/
