@@ -68,7 +68,7 @@ def get_classifiers_info(task, classifiers=None, pretrain_model=None):
 
     return returndict, patient_IDs, title
 
-def write_all_accuracies(pretrain_model='model_100epochs'):
+def write_all_accuracies(pretrain_model='second_model'):
     acc_directory = 'results/accuracies'
     for task in ['phonemes_noRest', 'small_gestures']:
         save_path = f'{acc_directory}/{task}/accuracies.txt'
