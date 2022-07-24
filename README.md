@@ -2,7 +2,7 @@
 
 ### Laurens Engwegen
 
-This is the repository for my MSc. Thesis in which different neural decoding strategies were implemented. These strategies were evaluated on two 4-class complex motor tasks performed by different patients. The data is not publicly available.
+This is the repository for my MSc. Thesis in which different neural decoding strategies were implemented. These strategies were evaluated on two 4-class complex motor tasks performed by different patients. The used data is confidential.
 
 * `preprocessing.py` contains the code for the preprocessing steps and the (possible) feature extraction procedure.
 * `trials_creation.py` constructs trials from the preprocessed data.
