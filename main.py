@@ -2,41 +2,52 @@ from utils import *
 from plots import *
 
 def create_plots():
-    pretrain_model = 'model_100epochs' # define for new_clf_plot to include finetuned EEGNet
+    to_plot = 'allclassifiers'
 
+    # Need to define which patients and tasks to plot results from
     IDs = ['1','2','3','4','5','6','7','8']
     task = 'phonemes_noRest'
     # IDs = ['9','10','11','12','13']
     # task = 'small_gestures'
 
-    # classifier = 'STMF'
-    # p_type = ['delta', 'theta', 'alpha', 'beta', 'gamma', 'allbands']
-    # plot_features_results(classifier, p_type, IDs, task=task, restvsactive=False, save_fig=True, anonymized=True)
+    if to_plot == 'features':
 
-    # classifier = 'kNN'
-    # p_type = 'gamma'
-    # plot_clf_optimization(classifier, p_type, IDs, task=task, save_fig=True, anonymized=True)
-    # classifier = 'FFN'
-    # p_type = 'gamma'
-    # plot_clf_optimization(classifier, p_type, IDs, task=task, save_fig=True, anonymized=True)
-    # classifier = 'FFN'
-    # p_type = 'CAR'
-    # plot_clf_optimization(classifier, p_type, IDs, task=task, save_fig=True, anonymized=True)
+        classifier = 'STMF'
+        p_type = ['delta', 'theta', 'alpha', 'beta', 'gamma', 'allbands']
+        plot_features_results(classifier, p_type, IDs, task=task, restvsactive=False, save_fig=True, anonymized=True)
 
-    # plot_classifier_results(task, pretrain_model=pretrain_model, save_fig=False, anonymized=True)
+    elif to_plot == 'optimization':
+        classifier = 'kNN'
+        p_type = 'gamma'
+        plot_clf_optimization(classifier, p_type, IDs, task=task, save_fig=True, anonymized=True)
+        classifier = 'FFN'
+        p_type = 'gamma'
+        plot_clf_optimization(classifier, p_type, IDs, task=task, save_fig=True, anonymized=True)
+        classifier = 'FFN'
+        p_type = 'CAR'
+        plot_clf_optimization(classifier, p_type, IDs, task=task, save_fig=True, anonymized=True)
 
-    tasks = ['finetuned_phonemes_noRest', 'finetuned_small_gestures']
-    for task in tasks:
-        model = 'EEGNet'
-        # plot_learning_curve(task, model, pretrain_model=pretrain_model, save_fig=True, anonymized=True)
+    elif to_plot == 'allclassifiers':
+        pretrain_model = 'second_model'
 
-    # write_all_accuracies()
-    # do_paired_ttest()
+        # Barplot with patients on x-axis
+        # tasks = ['small_gestures', 'phonemes_noRest']
+        # for task in tasks:
+        #     plot_classifier_results(task, pretrain_model=None, save_fig=False, anonymized=True)
+        
+        # Lineplot or barplot with classifiers on x-axis (barplot not recommended)
+        tasks = ['small_gestures', 'phonemes_noRest']
+        for task in tasks:
+            # classifiers = ['EEGNet', 'EEGNet finetuned']
+            classifiers = None # For all decoding strategies
+            new_clf_plot(task, classifiers, pretrain_model=None, barplot=False, save_fig=False, anonymized=True)
 
-    task = 'phonemes_noRest'
-    # classifiers = ['EEGNet', 'EEGNet finetuned']
-    classifiers = None
-    # new_clf_plot(task, classifiers, pretrain_model=None, barplot=False, save_fig=True, anonymized=True)
+    elif to_plot == 'learningcurve':
+        pretrain_model = 'second_model'
+        tasks = ['phonemes_noRest', 'small_gestures']
+        for task in tasks:
+            model = 'MLP (gamma)'
+            plot_learning_curve(task, model, pretrain_model=pretrain_model, save_fig=True, anonymized=True)
 
 
 if __name__ == '__main__':
@@ -44,11 +55,12 @@ if __name__ == '__main__':
     sampling_rate = 512
     # Number of samples at beginning and end of file that should be excluded
     buffer = 64
-    # Which task ('phonemes' (5-class), 'phonemes_noRest', 'gestures', s'mall_gestures')
-    # For pretraining: 'pretrain_phonemes' or 'pretrain_gestures'
+    # Which task ('phonemes' (5-class), 'phonemes_noRest', 'gestures', 'small_gestures')
+    # For pretraining: 'pretrain_phonemes' or 'pretrain_small_gestures'
     task = 'phonemes_noRest'
     # Patient data to use
     patient_IDs = ['1','2','3','4','5','6','7','8'] # Phonemes
+    # patient_IDs = ['10']
     # patient_IDs = ['9','10','11','12','13'] # Gestures
     # Type of preprocessing/features to extract
     # preprocessing_types = ['delta', 'theta', 'alpha', 'beta', 'gamma', 'allbands']
@@ -67,20 +79,19 @@ if __name__ == '__main__':
     create_trials = False
     classify = False
     make_plots = False # Plot mean freq band and confusion matrix
-    save_results = True
-    plot_results = False
+    save_results = False
+    plot_results = False # The ones defined in create_plots()
+
     # Either binary (rest vs. active) or multi-class classification
     restvsactive = False
 
     # Transfer learning
     pretrain = False # Set batch_size and epochs in function call below
-    finetune = True
-    model_name = 'first_model'
+    finetune = False
+    model_name = 'second_model'
 
-    # First model = Minimal number of rest vs. active trials + batch_size=5 + epochs=25
-    # Second model = Extended number of rest vs. active trials + batch_size=5 + epochs=25
-    # Third model = Extended number of rest vs. active trials + batch_size=32 + epochs=25
-    # Fourth model = thirdmodel with epochs=8 / .....
+    # Second model = Minimal number of rest vs. active trials + batch_size=5 + epochs=100
+    # model_100epochs = The same but trained on enlarged dataset
 
     pca = False
 
@@ -166,7 +177,6 @@ if __name__ == '__main__':
                                 save_results=save_results,
                                 save_intermediate_results=True,
                                 make_plots=make_plots)
-        # print_results(results, n_experiments) error cause not [classifier][ptype][patient] but just [patient]
 
     if plot_results:
         create_plots()
@@ -178,37 +188,6 @@ if __name__ == '__main__':
                 trials_path = f'data/{task}/{patient_data.patient}/{patient_data.patient}_{ptype}{classification_type}_trials.pkl'
                 pca_visualization(trials_path)
 
-    # small_gestures currently running:
-        # all features: STMF, SVM
-        # CAR: all FFNs, EEGNet
-
-    # TODO:
-    # V Add print info (nr. of experiments) when creating plots
-    # - t-SNE for data visualization
-    # - Fix HFB plotting (to be compatible with different number of classes)
-    # - Run all neural networks 5 more times (to get 10 in total)
-    # - Interpretation of kernel weights EEGNet
-    # - Change plot titles (on basis of task)
-    # - Run EEGNet with larger batchsize? Probably doesn't matter/not going to work because of the small number of trials
-
-    # - Multiple classes only available for 3 patients, including 7&8: the patients with noisy data
-
-    # - Drop too early and too late trials???
+    # write_all_accuracies(pretrain_model='second_model', to_file=True)
+    # do_paired_ttest(pretrain_model='second_model')
     
-    # - In patient '4' trials data: 5 trials have -1 at 3rd column that don't have -1 at 2nd column
-    #   while having normal label and normal VOT. Are those bad trials or not? (Not the case for other patients)
-
-    # Probably better to create 1 script for classifcation with DL models
-    # And for each neural network a separate class just for init and forward
-
-    # Questions:
-    # - Should I not use/look at F1 score (instead of accuracy)?
-
-    # Correct results (without removing 'too early' and 'too late' trials):
-    # - Phonemes: kNN, STMF, SVM, EEGNet, FFNgamma bash2, FFNCAR bash3
-    # - Phonemes_noRest: kNN, STMF, SVM, EEGNet, FFNgamma, FFNCAR
-    # - Phonemes RvA: STMF
-    # - Gestures: kNN, STMF, SVM, (EEGNet: results with old code, but too early/late removed, so should be correct), FFNgamma, FFNCAR
-
-
-    # Should I still use categorical crossentropy loss when pretraining? Instead of binary crossentropy

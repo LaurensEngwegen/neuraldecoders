@@ -54,6 +54,8 @@ class EEGNet_tf_Classifier():
         self.dropoutType = dropoutType
 
     def initialize_model(self):
+        # The original implementation of EEGNet is used here
+
         if self.dropoutType == 'SpatialDropout2D':
             dropoutType = SpatialDropout2D
         elif self.dropoutType == 'Dropout':
@@ -95,7 +97,7 @@ class EEGNet_tf_Classifier():
         model.compile(loss='categorical_crossentropy', optimizer='adam', metrics = ['accuracy'])
         return model
 
-    def train(self, X_train, y_train, batch_size=5, epochs=25, verbose=0):
+    def train(self, X_train, y_train, batch_size=5, epochs=100, verbose=0):
         self.model.fit(X_train, y_train, batch_size=batch_size, epochs=epochs, verbose=verbose)
 
     def single_prediction(self, X_test):

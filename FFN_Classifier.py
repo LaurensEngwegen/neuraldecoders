@@ -28,8 +28,8 @@ class FFNModel(nn.Module):
 
 class FFN_Classifier():
     def __init__(self, X, y, labelsdict, 
-                 n_nodes=[512,256],
-                 batch_size=1,
+                 n_nodes=[128,64],
+                 batch_size=5,
                  loss_fct=nn.CrossEntropyLoss,
                  optimizer=optim.Adam):
         # Search for cuda device
@@ -69,7 +69,7 @@ class FFN_Classifier():
         dataloader = DataLoader(TensorDataset(X, y), shuffle=False, batch_size=self.batch_size)
         return dataloader, X, y
 
-    def train(self, dataloader, test_index, intermediate_y_trues, intermediate_y_preds, n_epochs=10, verbose=0):
+    def train(self, dataloader, test_index, intermediate_y_trues, intermediate_y_preds, n_epochs=100, verbose=0):
         # Initialize optimizer and loss function
         optimizer = self.optimizer(self.model.parameters())
         lossfunction = self.loss_fct()
@@ -114,13 +114,13 @@ class FFN_Classifier():
         return intermediate_y_trues, intermediate_y_preds
             
 
-    # TODO
+    # TODO: update
     def single_classification(self, test_index):
         self.model = FFNModel(self.n_features, self.n_classes, self.n_nodes).to(self.device)
         train_indices = [j for j in range(len(self.y)) if j != test_index]
         train_dataloader, self.X_train, self.y_train = self.create_dataloader(self.X[train_indices], self.y[train_indices])
         print(self.model)
-        self.train(train_dataloader, n_epochs=30)
+        self.train(train_dataloader, n_epochs=100)
 
         self.model.eval()
         _, X_test, y_test = self.create_dataloader(self.X[test_index:test_index+1], self.y[test_index:test_index+1])
@@ -131,7 +131,7 @@ class FFN_Classifier():
     def LOO_classification(self, plot_cm=True):
         y_preds, y_trues = [], []
         correct = 0
-        epochs = 25
+        epochs = 100
         # Create dictionaries to log test results every 5 epochs
         intermediate_y_trues, intermediate_y_preds = dict(), dict()
         for i in range(0, epochs+1, 5):

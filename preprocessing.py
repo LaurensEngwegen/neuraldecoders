@@ -157,8 +157,6 @@ class Preprocessor():
             car_data = data - np.mean(data[CAR_channels], 0)
         return car_data
 
-    # TODO: find better way to include RvA
-    # TODO: add more comments
     def wavelet_transform(self, data, plot_result=False, nr_channels=-1):
         if nr_channels == -1:
             nr_channels = data.shape[0]
@@ -169,8 +167,8 @@ class Preprocessor():
             'theta': np.arange(4,9),
             'alpha': np.arange(8,13),
             'beta': np.arange(13,31),
-            'gamma': np.arange(40,151), # Previously called 'broadband40-150'
-            'gestures_gamma': np.arange(70,126), # gamma band for gestures task (used in paper)
+            'gamma': np.arange(40,151),
+            'gestures_gamma': np.arange(70,126), # gamma band used in gesture paper
         }
         if self.patient_data.ID == '7':
             freq_bands['gamma'] = np.arange(40,111)
@@ -209,8 +207,6 @@ class Preprocessor():
     def z_score_spectra(self, spectra):
         print(f'Z-scoring spectra...')
         # Spectra: E x B x T
-        # buffer = 64 # Original code: (2*ECoG_feature_params.span*ceil(ECoG_feature_params.sample_rate/ECoG_feature_params.spectra(1)));
-                    # But parameter span not used here (because default used for Morlet wavelet)
         for freq_band in tqdm(range(spectra.shape[1])):
             for i in range(len(self.break_points)-1):
                 chunk_points = np.arange(self.break_points[i]+self.buffer, self.break_points[i+1]-self.buffer)
@@ -222,7 +218,7 @@ class Preprocessor():
 
     def smooth_spectra(self, data):
         # Smoothing
-        if self.preprocessing_type == 'gestures_gamma':
+        if self.preprocessing_type == 'gestures_gamma': # Only used for comparison with paper parameters/implementation
             smooth_window = 0.5 # seconds
         else:
             smooth_window = 0.1 # seconds

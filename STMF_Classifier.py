@@ -1,6 +1,4 @@
-import os
 from tqdm import tqdm
-import pickle as pkl
 import numpy as np
 import matplotlib.pyplot as plt
 from sklearn.metrics import ConfusionMatrixDisplay
@@ -91,8 +89,8 @@ class STMF_Classifier():
                 for i, electrode in enumerate(hfb):
                     hfb[i] = (electrode - np.mean(electrode)) / np.std(electrode)
         # Plot Z-scored HFBs
-        fig, ax = plt.subplots(1, self.n_labels, figsize=(16,4))
-        plt.suptitle('Mean gamma band per class')
+        fig, ax = plt.subplots(1, self.n_labels, figsize=(16,4), sharey=True, sharex=True)
+        # plt.suptitle('Gamma band features per class for patient 1')
         for i, label in enumerate(HFB_perclass):
             ax[i].matshow(HFB_perclass[label], aspect='auto')#, cmap='jet')
             ax[i].set_title(f'{self.id2label[label]}')
@@ -101,7 +99,7 @@ class STMF_Classifier():
             ax[i].xaxis.set_ticks_position('bottom')
             # Set correct y-ticks (electrodes)
             ax[i].yaxis.set_ticks([i for i in range(9,self.n_electrodes,10)], [i for i in range(10,self.n_electrodes+1,10)])
-        ax[2].set_xlabel('Time in seconds (0 at VOT)') # Change to MOT for gestures
-        ax[0].set_ylabel('Electrodes')
+        fig.supxlabel('Time in seconds (0 at VOT)') # Change VOT/MOT
+        fig.supylabel('Electrodes')
         fig.tight_layout()
         plt.show()

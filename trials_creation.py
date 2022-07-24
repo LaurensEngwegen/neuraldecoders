@@ -95,6 +95,7 @@ class Trials_Creator():
         task_data = self.task_data
         raw_trial_length = task_data[0,1]-task_data[0,0]
 
+        # Filtering below was already done
         # Mark sample points that are 10 st. devs. larger or smaller than the mean signal (over all channels)
         # noisy_samples = np.sum(self.ecog_data, 0) > np.mean(np.sum(self.ecog_data, 0)) + 10*np.std(np.sum(self.ecog_data, 0))
         # noisy_samples += np.sum(self.ecog_data, 0) < np.mean(np.sum(self.ecog_data, 0)) - 10*np.std(np.sum(self.ecog_data, 0))
@@ -107,7 +108,6 @@ class Trials_Creator():
 
         # Drop bad trials indicated with -1 in column 2
         print(f'Number of bad (-1) trials: {task_data[:, task_data[1, :] == -1].shape[1]}')
-        print(f'Number of trials with -1 in column 3: {task_data[:, task_data[2, :] == -1].shape[1]}')
         task_data = task_data[:, task_data[1,:] != -1]
 
         # # Drop too early trials
@@ -139,7 +139,7 @@ class Trials_Creator():
         print(f'Shape trials data: {data.shape}')
         return data, labels
 
-    def get_data(self, processed_data, trial, startpoint, endpoint, totalpoints, sliding_window=True):
+    def get_data(self, processed_data, trial, startpoint, endpoint, totalpoints, sliding_window=False):
         '''
         trial is vector consisting of [COT, VOT/MOT, _, label]
         
