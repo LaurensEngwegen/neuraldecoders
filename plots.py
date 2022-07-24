@@ -9,7 +9,7 @@ import pickle as pkl
 import matplotlib.pyplot as plt
 
 # Increase font size in plots
-plt.rcParams.update({'font.size': 16})
+plt.rcParams.update({'font.size': 18})
 
 # Functions to get info
 
@@ -34,26 +34,26 @@ def get_bar_positions(n_params, width):
 
 def get_classifiers_info(task, classifiers=None, pretrain_model=None):
     result_info = {
-        'STMF': {'classifier': 'STMF', 'ptype': 'gamma'}
+        'STMF': {'ptype': 'gamma', 'classifier': 'STMF'}
     }
     if task == 'phonemes' or task == 'phonemes_noRest':
         if task == 'phonemes':
             n_classes = '5'
         else:
             n_classes = '4'
-        title = f'Accuracy of different classifiers on {n_classes}-class phoneme classification'
+        title = f'Accuracy of decoding strategies\non {n_classes}-class phoneme classification'
         patient_IDs = ['1','2','3','4','5','6','7','8']
         result_info['kNN'] = {'ptype': 'gamma', 'classifier': 'kNN11'}
         result_info['SVM'] = {'ptype': 'gamma', 'classifier': 'SVM'}
         result_info['MLP (gamma)'] = {'ptype': 'gamma', 'classifier': 'FFN128-64'}
-        result_info['MLP (CAR)'] =  {'classifier': 'FFN128-64', 'ptype': 'CAR'}
+        result_info['MLP (CAR)'] =  {'ptype': 'CAR', 'classifier': 'FFN128-64'}
     else: # gestures or small_gestures
-        title = f'Accuracy of different classifiers on 4-class gesture classification'
+        title = f'Accuracy of decoding strategies\non 4-class gesture classification'
         patient_IDs = ['9','10','11','12','13']
         result_info['kNN'] = {'ptype': 'gamma', 'classifier': 'kNN3'}
         result_info['SVM'] = {'ptype': 'gamma', 'classifier': 'SVM'}
-        result_info['MLP (gamma)'] = {'ptype': 'gamma', 'classifier': 'FFN64-32'}
-        result_info['MLP (CAR)'] =  {'classifier': 'FFN128-64', 'ptype': 'CAR'}
+        result_info['MLP (gamma)'] = {'ptype': 'gamma', 'classifier': 'FFN128-64'}
+        result_info['MLP (CAR)'] =  {'ptype': 'CAR', 'classifier': 'FFN128-64'}
     
     result_info['EEGNet'] = {'ptype': 'CAR', 'classifier': 'EEGNet'}
     if pretrain_model is not None:
@@ -68,11 +68,12 @@ def get_classifiers_info(task, classifiers=None, pretrain_model=None):
 
     return returndict, patient_IDs, title
 
-def write_all_accuracies(pretrain_model='second_model'):
+def write_all_accuracies(pretrain_model='second_model', to_file=True):
     acc_directory = 'results/accuracies'
-    for task in ['phonemes_noRest', 'small_gestures']:
+    tasks = ['phonemes_noRest', 'small_gestures']
+    for task in tasks:
         save_path = f'{acc_directory}/{task}/accuracies.txt'
-        classifier_info, patient_IDs, _ = get_classifiers_info(task, pretrain_model)
+        classifier_info, patient_IDs, _ = get_classifiers_info(task=task, classifiers=None, pretrain_model=pretrain_model)
         # Get patient names
         patient_labels = []
         for patient_ID in patient_IDs:
@@ -80,7 +81,6 @@ def write_all_accuracies(pretrain_model='second_model'):
         # Read results
         # For all classifiers defined in classifier_info
         for key in classifier_info.keys():
-            accs = []
             classifier = classifier_info[key]['classifier']
             preprocessing_type = classifier_info[key]['ptype']
             for patient in patient_labels:
@@ -90,11 +90,14 @@ def write_all_accuracies(pretrain_model='second_model'):
                 else:
                     results_directory = f'results/{task}/{classifier}/{preprocessing_type}'
                 results_file = f'{results_directory}/{patient}_results.pkl'
-                acc, _ = get_accuracy(results_file)
-                with open(save_path, 'a+') as f:
-                    f.write(f'{key}\t{patient}\t{acc}\n')
+                acc, std = get_accuracy(results_file)
+                if to_file:
+                    with open(save_path, 'a+') as f:
+                        f.write(f'{key}\t{patient}\t{acc}\t{std}\n')
+                print(f'{key}\t{patient}\t{acc}\t{std}')
+        print(f'Accuracies for {task} written to: \'{save_path}\'')
 
-def do_paired_ttest(pretrain_model='model_100epochs'):
+def do_paired_ttest(pretrain_model='second_model'):
     acc_directory = 'results/accuracies'
     for task in ['phonemes_noRest', 'small_gestures']:
         print(f'\nTask: {task}')
@@ -102,12 +105,10 @@ def do_paired_ttest(pretrain_model='model_100epochs'):
         with open(acc_path) as f:
             reader = csv.reader(f, delimiter='\t')
             acc_list = list(reader)
-        classifier_info, patient_IDs, _ = get_classifiers_info(task, pretrain_model)
+        classifier_info, patient_IDs, _ = get_classifiers_info(task=task, pretrain_model=pretrain_model)
         classifiers = list(classifier_info.keys())
-        patients = []
-        for patient_ID in patient_IDs:
-            patients.append(PatientDataMapper(patient_ID, task).patient)
-        # Create dict: {'classifier': [accuracies]}
+        
+        # Create dict: {'classifier': [accuracies]}, accuracies length = #patients
         acc_dict = dict()
         for item in acc_list:
             if item[0] not in acc_dict.keys():
@@ -121,8 +122,6 @@ def do_paired_ttest(pretrain_model='model_100epochs'):
                 print(f'{classifiers[i]} - {classifiers[j]}: {testresult.pvalue}')
 
     
-
-
 # Functions to create barplots
 
 def plot_features_results(classifier, preprocessing_types, patient_IDs, restvsactive=False, task='phonemes', save_fig=False, anonymized=True):
@@ -161,16 +160,25 @@ def plot_features_results(classifier, preprocessing_types, patient_IDs, restvsac
     save_path = f'figures/{task}/{classifier}_differentfeatures'
     # save_path = f'figures/{task}/{classifier}_differentfeatures_wArticle'
     if task == 'phonemes':
+        # Plot chance level
+        plt.plot([-0.5, 7.5], [0.25,0.25], linestyle=':', c='black', alpha=0.5)
+        plt.xlim(-0.75,7.75)
         if restvsactive:
-            title = f'Accuracy of {classifier} with different features on rest vs. active phoneme'
+            title = f'Accuracy of {classifier} with different features\non rest vs. active phoneme classification'
             save_path = f'figures/{task}/{classifier}_RvA_differentfeatures'
         else:
-            title = f'Accuracy of {classifier} with different features on 5-class phonemes'
+            title = f'Accuracy of {classifier} with different features\non 5-class phonemes classification'
     elif task == 'phonemes_noRest':
-        title = f'Accuracy of {classifier} with different features on 4-class phonemes'
+        # Plot chance level
+        plt.plot([-0.75, 7.75], [0.25,0.25], linestyle=':', c='black', alpha=0.5)
+        plt.xlim(-0.75,7.75)
+        title = f'Accuracy of {classifier} with different features\non 4-class phonemes classification'
     else: # gestures or small_gestures
-        title = f'Accuracy of {classifier} with different features on 4-class gestures'
-    plt.title(title)
+        # Plot chance level
+        plt.plot([-0.5, 4.5], [0.25,0.25], linestyle=':', c='black', alpha=0.5)
+        plt.xlim(-0.5,4.5)
+        title = f'Accuracy of {classifier} with different features\non 4-class gestures classification'
+    plt.title(title, y=1.04)
     plt.ylabel('Accuracy')
     plt.xlabel('Patient')
     if anonymized:
@@ -178,6 +186,7 @@ def plot_features_results(classifier, preprocessing_types, patient_IDs, restvsac
         save_path = f'{save_path}_anonym'
     else:
         plt.xticks(x_axis, patient_labels)
+    
     plt.yticks(np.arange(0,1.01,0.1))
     plt.legend(loc = 6, bbox_to_anchor = (1, 0.5))
     plt.grid(alpha=0.35)
@@ -187,7 +196,7 @@ def plot_features_results(classifier, preprocessing_types, patient_IDs, restvsac
         print(f'Figure saved at \'{save_path}\'')
     plt.show()
     
-def plot_clf_optimization(classifier, preprocessing_type, patient_IDs, restvsactive=False, task='phonemes', save_fig=False, anonymized=True):
+def plot_clf_optimization(classifier, p_type, patient_IDs, restvsactive=False, task='phonemes', save_fig=False, anonymized=True):
     # k's tested for kNN
     if classifier == 'kNN':
         params = ['3','5','7','9','11','13','15','17','19']
@@ -204,7 +213,7 @@ def plot_clf_optimization(classifier, preprocessing_type, patient_IDs, restvsact
         tested_classifiers.append(f'{classifier}{param}')
 
     if restvsactive:
-        preprocessing_type = f'{preprocessing_type}_RvA'
+        p_type = f'{p_type}_RvA'
     # Define plot variables
     patient_labels = []
     for patient_ID in patient_IDs:
@@ -217,26 +226,26 @@ def plot_clf_optimization(classifier, preprocessing_type, patient_IDs, restvsact
     all_data = []
     for tested_clf in tested_classifiers:
         data = []
-        directory = f'results/{task}/{tested_clf}/{preprocessing_type}'
+        directory = f'results/{task}/{tested_clf}/{p_type}'
         for patient_ID in patient_IDs:
             patient_data = PatientDataMapper(patient_ID, task)
             file = f'{directory}/{patient_data.trials_fileID}_results.pkl'
             acc, _ = get_accuracy(file)
             data.append(acc)
-        all_data.append(data) # Patients x Preprocessing_types
+        all_data.append(data) # Parameter values x Patients
     # Barplot
     plt.figure(figsize=(12,8))
     for i, data in enumerate(all_data):
         plt.bar(x_axis + pos[i], data, width=width, label=f'{labelprefix} {params[i]}')
     if task == 'phonemes':
         if restvsactive:
-            title = f'Fundamental optimization  of {classifier_title} ({p_type}) on active vs. rest'
+            title = f'Fundamental optimization  of {classifier_title} ({p_type})\non active vs. rest'
         else:
-            title = f'Fundamental optimization  of {classifier_title} ({p_type}) on 5-class phonemes'
+            title = f'Fundamental optimization  of {classifier_title} ({p_type})\non 5-class phonemes'
     elif task == 'phonemes_noRest':
-        title = f'Fundamental optimization of {classifier_title} ({p_type}) on 4-class phonemes'
+        title = f'Fundamental optimization of {classifier_title} ({p_type})\non 4-class phonemes'
     else: # gestures or small_gestures
-        title = f'Fundamental optimization  of {classifier_title} ({p_type}) on 4-class gestures'
+        title = f'Fundamental optimization  of {classifier_title} ({p_type})\non 4-class gestures'
     save_path = f'figures/{task}/{classifier}_{p_type}_optimization'
     plt.title(title)
     plt.ylabel('Accuracy')
@@ -285,7 +294,7 @@ def plot_classifier_results(task='phonemes', pretrain_model=None, save_fig=False
         all_stds.append(stds)
         titles.append(key)
 
-    save_path = f'figures/{task}/all_clfs_barplot'
+    save_path = f'figures/{task}/all_clfs_barplotperpatient'
     plt.figure(figsize=(12,8))
     # Add +1 to n_params to include article acc.
     # plot_article_acc(x_axis, pos[len(pos)-1], width, task=task)
@@ -302,7 +311,6 @@ def plot_classifier_results(task='phonemes', pretrain_model=None, save_fig=False
     plt.grid(alpha=0.35)
     plt.tight_layout()
     if save_fig:
-        
         plt.savefig(f'{save_path}.png', format='png')
         print(f'Figure saved at \'{save_path}\'')
     plt.show()
@@ -377,7 +385,7 @@ def plot_learning_curve(task, model='EEGNet', pretrain_model='model_25epochs', s
 
     if anonymized:
         save_path = f'{save_path}_anonym'
-    plt.title(f'Learning curve of {model_title} on {task_title}')
+    plt.title(f'Learning curve of {model_title} on {task_title}', y=1.02) # Manually add pretraining scenario
     plt.xlabel('Epochs')
     plt.ylabel('Accuracy')
     end = (len(mean_per_epoch)*5)-5 # Starts at 0, steps of 5
@@ -400,7 +408,7 @@ def new_clf_plot(task='phonemes_noRest', classifiers=None, pretrain_model=None, 
     pos = get_bar_positions(n_params, width)
     save_path = f'figures/{task}/all_clfs_lineplot'
 
-    plt.figure(figsize=(11,8))
+    plt.figure(figsize=(12,8))
     for i, patient_ID in enumerate(patient_IDs):
         patient_info = PatientDataMapper(patient_ID, task)
         accs, stds = [], []
@@ -422,21 +430,29 @@ def new_clf_plot(task='phonemes_noRest', classifiers=None, pretrain_model=None, 
         else:
             label = patient_info.patient        
         if barplot:
-            plt.bar(x_axis+pos[i], accs, label=label, width=width, alpha=0.8)
+            plt.bar(x_axis+pos[i], accs, yerr=stds, label=label, width=width, alpha=0.8)
         else:
-            plt.plot(np.arange(len(accs)), accs, label=label, marker='p', markersize=9, linestyle=(0, (1, 5)), linewidth=1.2, alpha=0.7)
+            plt.plot(np.arange(len(accs)), accs, label=label, marker='p', markersize=12, linestyle=(0, (1, 5)), linewidth=2.0, alpha=0.7)
     
     if barplot:
-        plt.plot([-0.5, 6.5], [0.25, 0.25], linestyle=':', c='black', alpha=0.5)
-        save_path = f'{save_path}_bar'
+        plt.plot([-0.25, 5.25], [0.25, 0.25], linestyle=':', c='black', alpha=0.5)
+        save_path = f'figures/{task}/all_clfs_barplot'
     else:
-        plt.plot(np.arange(len(accs)), [0.25]*len(accs), linestyle='dashed', c='black', alpha=0.5)
-        # plt.plot([-0.5,1.5], [0.25,0.25], linestyle='dashed', c='black', alpha=0.5)
+        if len(accs) == 2: # EEGNet vs finetuned EEGNet
+            plt.plot([-0.25,1.25], [0.25,0.25], linestyle='dashed', c='black', alpha=0.5)
+            plt.xlim(-0.2, 1.2)
+            temp = 'gesture' if task == 'small_gestures' else 'phoneme'
+            index = '1' if pretrain_model == 'second_model' else '2'
+            title = f'Accuracy of EEGNet and EEGNet finetuned {index}\non 4-class {temp} classification'
+            save_path = f'figures/finetuned_{task}/EEGNet_vs_finetuned_{pretrain_model}_lineplot'
+        else:    
+            plt.plot([-0.5,9], [0.25,0.25], linestyle='dashed', c='black', alpha=0.5)
+            plt.xlim(-0.25, 5.25)
     
     x_axis = np.arange(len(classifier_info))
     if anonymized:
         save_path = f'{save_path}_anonym'
-    plt.title(title)
+    plt.title(title, y=1.04)
     plt.ylabel('Accuracy')
     plt.xticks(x_axis, classifier_info.keys())
     plt.yticks(np.arange(0,1.01,0.1))
