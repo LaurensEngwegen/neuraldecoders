@@ -1,14 +1,14 @@
 from patient_data_mapping import PatientDataMapper
 from preprocessing import Preprocessor
 from trials_creation import Trials_Creator
-from STMF_Classifier import STMF_Classifier
-from SVM_Classifier import SVM_Classifier
-from kNN_Classifier import kNN_Classifier
-from FFN_Classifier import FFN_Classifier
-from EEGNet_tf_Classifier import EEGNet_tf_Classifier
-from EEGNet_torch_Classifier import EEGNet_torch_Classifier
-from LSTM_Classifier import LSTM_Classifier
-from LSTM_Classifier_tf import LSTM_Classifier_tf
+from classifiers.STMF_Classifier import STMF_Classifier
+from classifiers.SVM_Classifier import SVM_Classifier
+from classifiers.kNN_Classifier import kNN_Classifier
+from classifiers.FFN_Classifier import FFN_Classifier
+from classifiers.EEGNet_tf_Classifier import EEGNet_tf_Classifier
+from classifiers.EEGNet_torch_Classifier import EEGNet_torch_Classifier
+from classifiers.LSTM_Classifier import LSTM_Classifier
+from classifiers.LSTM_Classifier_tf import LSTM_Classifier_tf
 
 import os
 import numpy as np
