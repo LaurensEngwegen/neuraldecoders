@@ -154,8 +154,8 @@ class EEGNet_tf_Classifier():
         if plot_cm:
             ConfusionMatrixDisplay.from_predictions(y_trues, y_preds, display_labels=self.labels)
             plt.show()
-        for key in intermediate_y_preds:
-            print(f'{key}: {accuracy_score(intermediate_y_preds[key], intermediate_y_trues[key])}')
+        # for key in intermediate_y_preds:
+        #     print(f'{key}: {accuracy_score(intermediate_y_preds[key], intermediate_y_trues[key])}')
         return accuracy, y_trues, y_preds, intermediate_y_trues, intermediate_y_preds
 
     def finetune(self, model_savefile, make_plots, save_intermediate_results):
